@@ -35,7 +35,7 @@ import com.sun.faban.driver.Timing;
 		cycleType = CycleType.CYCLETIME) // cycle time or think time - count from the start of prev operation or end
 
 /**
- * The main driver class specifying all the Faban operations.
+ * The main driver class.
  * 
  * @author Tapti Palit
  *
@@ -154,6 +154,21 @@ public class Web20Driver {
 		return loggedInClientList.get(randomIndex);
 	}
 	
+	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb) {
+        // Get the token values
+        int elggTokenStartIndex = sb.indexOf("\"__elgg_token\":\"") + "\"__elgg_token\":\"".length();
+        int elggTokenEndIndex = sb.indexOf("\"", elggTokenStartIndex);
+        String elggToken = sb.substring(elggTokenStartIndex, elggTokenEndIndex);
+        System.out.println("Elgg Token = "+elggToken);
+        
+        int elggTsStartIndex = sb.indexOf("\"__elgg_ts\":") + "\"__elgg_ts\":".length();
+        int elggTsEndIndex = sb.indexOf(",", elggTsStartIndex);
+        String elggTs = sb.substring(elggTsStartIndex, elggTsEndIndex);
+        System.out.println("Elgg Ts = "+elggTs);
+        
+        client.setElggToken(elggToken);
+        client.setElggTs(elggTs);
+	}
 	
 	@BenchmarkOperation (
 			name = "UpdateActivity",
@@ -186,27 +201,19 @@ public class Web20Driver {
 			client.setPassword(userPwdPair.getPassword());
 			
 			HttpTransport http = HttpTransport.newInstance();
+			http.addTextType("application/xhtml+xml");
+			http.addTextType("application/xml");
+			http.addTextType("q=0.9,*/*");
+			http.addTextType("q=0.8");
 			client.setHttp(http);
 			
 	        StringBuilder sb = http.fetchURL(hostUrl+ROOT_URL);
-	        // Get the token values
-	        int elggTokenStartIndex = sb.indexOf("\"__elgg_token\":\"") + "\"__elgg_token\":\"".length();
-	        int elggTokenEndIndex = sb.indexOf("\"", elggTokenStartIndex);
-	        String elggToken = sb.substring(elggTokenStartIndex, elggTokenEndIndex);
-	        System.out.println("Elgg Token = "+elggToken);
-	        
-	        int elggTsStartIndex = sb.indexOf("\"__elgg_ts\":") + "\"__elgg_ts\":".length();
-	        int elggTsEndIndex = sb.indexOf(",", elggTsStartIndex);
-	        String elggTs = sb.substring(elggTsStartIndex, elggTsEndIndex);
-	        System.out.println("Elgg Ts = "+elggTs);
-	        
+	        updateElggTokenAndTs(client, sb);
 	        for (String url: ROOT_URLS) {
 	        	http.readURL(hostUrl+url);
 	            //System.out.println(sb.indexOf("__elgg_token"));
 	        }
 	        
-	        client.setElggToken(elggToken);
-	        client.setElggTs(elggTs);
 	        homeClientList.add(client);
 		}
 	}
@@ -229,7 +236,17 @@ public class Web20Driver {
 		 */
 		String postRequest="__elgg_token="+client.getElggToken()+"&__elgg_ts="+client.getElggTs()+"&username="+client.getUsername()+"&password="+client.getPassword();
 		System.out.println("post request = "+postRequest);
-		client.getHttp().fetchURL(hostUrl+LOGIN_URL, postRequest);
+        for (String url: LOGIN_URLS) {
+        	client.getHttp().readURL(hostUrl+url);
+        }
+		Map<String, String> headers = new HashMap<String, String>();
+		headers.put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		headers.put("Accept-Language", "en-US,en;q=0.5");
+		headers.put("Accept-Encoding", "gzip, deflate");
+		headers.put("Referer", hostUrl+"/");
+		headers.put("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+
+		client.getHttp().fetchURL(hostUrl+LOGIN_URL, postRequest, headers);
 		// We should get a redirect to the ROOT URL which we should try to GET
 		assert (client.getHttp().getResponseCode() == 302);
 		String locations[] = client.getHttp().getResponseHeader("Location");
@@ -239,15 +256,13 @@ public class Web20Driver {
 		locations = client.getHttp().getResponseHeader("Location");
 		// We should a redirect to the ACTIVITY URL
 		assert ((hostUrl+ACTIVITY_URL).equals(locations[0]));
-		client.getHttp().fetchURL(hostUrl+ACTIVITY_URL);
+		StringBuilder sb = client.getHttp().fetchURL(hostUrl+ACTIVITY_URL);
+        updateElggTokenAndTs(client, sb);
+//		System.out.println(sb);
 		for (String url: ACTIVITY_URLS) {
 			client.getHttp().fetchURL(hostUrl+url);
 		}
 		assert (client.getHttp().getResponseCode() == 200);
-		//System.out.println(out);
-        for (String url: LOGIN_URLS) {
-        	client.getHttp().readURL(hostUrl+url);
-        }
         
         loggedInClientList.add(client);
         activityClientList.add(client);
@@ -272,16 +287,22 @@ public class Web20Driver {
 				client.getHttp().fetchURL(hostUrl+url);
 			}
 		}
-		String status = "Test+status+test+status+test+status+test+status";
-		String postRequest = "__elgg_token="+client.getElggToken()+"&__elgg_ts="+client.getElggTs()+"&status="+status+"&address=&access_id=2&origin=wall&container_guid=37";
+		String status = "Test";
+		String postRequest = "__elgg_token="+client.getElggToken()+"&__elgg_ts="+client.getElggTs()+"&status="+status+"&address=&access_id=2&origin=wall&container_guid=48";
 
 		Map<String, String> headers = new HashMap<String, String>();
+		headers.put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		headers.put("Accept-Language", "en-US,en;q=0.5");
+		headers.put("Accept-Encoding", "gzip, deflate");
 		headers.put("Referer", hostUrl+"/activity");
+		headers.put("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+
 		client.getHttp().fetchURL(hostUrl+WALL_URL, postRequest, headers);
 		if (client.getHttp().getResponseCode() == 302) {
 			String[] location = client.getHttp().getResponseHeader("Location");
-			StringBuilder out = client.getHttp().fetchURL(location[0]);
-			System.out.println(out);
+			System.out.println("Forwarding to "+location[0]);
+			StringBuilder sb = client.getHttp().fetchURL(location[0]);
+	        updateElggTokenAndTs(client, sb);
 		}
 	}
 	
@@ -289,7 +310,7 @@ public class Web20Driver {
 		Web20Driver driver = new Web20Driver();
 		driver.accessHomePage();
 		driver.doLogin();
-		driver.updateActivity();
+		// driver.updateActivity();
 		driver.postSelfWall();
 			
 	}
