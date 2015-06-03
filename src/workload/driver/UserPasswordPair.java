@@ -1,5 +1,11 @@
-package web20_benchmark;
+package workload.driver;
 
+/**
+ * This class maintains the mapping between the user and her password.
+ * 
+ * @author Tapti Palit
+ *
+ */
 public class UserPasswordPair {
 
 	private String userName;

@@ -1,4 +1,4 @@
-package web20_benchmark;
+package workload.driver;
 
 import java.net.MalformedURLException;
 import java.util.ArrayList;
@@ -34,6 +34,12 @@ import com.sun.faban.driver.Timing;
 		cycleMean = 500, //0.5 seconds
 		cycleType = CycleType.CYCLETIME) // cycle time or think time - count from the start of prev operation or end
 
+/**
+ * The main driver class specifying all the Faban operations.
+ * 
+ * @author Tapti Palit
+ *
+ */
 public class Web20Driver {
 
 	private DriverContext context;
@@ -285,5 +291,6 @@ public class Web20Driver {
 		driver.doLogin();
 		driver.updateActivity();
 		driver.postSelfWall();
+			
 	}
 }

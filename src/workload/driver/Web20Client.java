@@ -1,7 +1,13 @@
-package web20_benchmark;
+package workload.driver;
 
 import com.sun.faban.driver.HttpTransport;
 
+/**
+ * This class contains all details of one particular Elgg user.
+ * 
+ * @author Tapti Palit
+ *
+ */
 public class Web20Client {
 	
 	private String elggToken;
