@@ -8,13 +8,13 @@
 	<fa:runConfig definition="workload.driver.Web20Driver"
 		xmlns:fa="http://faban.sunsource.net/ns/faban" xmlns:fh="http://faban.sunsource.net/ns/fabanharness"
 		xmlns="http://faban.sunsource.net/ns/fabandriver">
-		<fa:hostconfig>
-			<fa:host>brazilian.sfbay</fa:host>
+		<fa:hostConfig>
+			<fa:host>localhost</fa:host>
 			<fh:enabled>true</fh:enabled>
 			<fh:cpus>0</fh:cpus>
 			<fh:tools>NONE</fh:tools>
 			<fh:userCommands />
-		</fa:hostconfig>
+		</fa:hostConfig>
 		<fa:scale>20</fa:scale>
 		<fa:runControl unit="time">
 			<fa:rampUp>60</fa:rampUp>
@@ -36,7 +36,7 @@
 			<interval>5</interval>
 		</runtimestats>
 		<!-- The driver-specific config. -->
-		<driverconfig name="WebDriver">
+		<driverConfig name="ElggDriver">
 			<agents>1</agents>
 			<stats>
 				<interval>30</interval>
@@ -52,10 +52,10 @@
 				</property>
 				<property name="path3">bar/</property>
 			</properties>
-		</driverconfig>
-		<serverconfig>
+		</driverConfig>
+		<serverConfig>
 			<host>10.22.17.101</host>
 			<port>80</port>
-		</serverconfig>
+		</serverConfig>
 	</fa:runConfig>
 </webbenchmark>
