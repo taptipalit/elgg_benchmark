@@ -8,6 +8,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.logging.Logger;
 
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Text;
+
 import com.sun.faban.driver.BenchmarkDefinition;
 import com.sun.faban.driver.BenchmarkDriver;
 import com.sun.faban.driver.BenchmarkOperation;
@@ -119,6 +124,33 @@ public class Web20Driver {
 	public Web20Driver() throws MalformedURLException {
 		
 		context = DriverContext.getContext();
+		
+		userPasswordList = new ArrayList<UserPasswordPair>();
+		Element properties = context.getPropertiesNode();
+		NodeList propList = properties.getChildNodes();
+		for (int i = 0; i < propList.getLength(); i++) {
+			Node property =  propList.item(i);
+			if (property instanceof Node) {
+				Node element = (Node) property;
+				if(!"#text".equals(element.getNodeName())) {
+					UserPasswordPair pair = new UserPasswordPair();
+					NodeList elemChildren = element.getChildNodes();
+					for (int j = 0; j < elemChildren.getLength(); j++) {
+						Node property2 = elemChildren.item(j);
+						if (property2 instanceof Node) {
+							Node element2 = (Node) property2;
+							if ("username".equals(element2.getNodeName())) {
+								pair.setUserName(element2.getTextContent());
+							} else if ("password".equals(element2.getNodeName())) {
+								pair.setPassword(element2.getTextContent());
+							}
+						}
+					}
+					userPasswordList.add(pair);
+				}
+			}
+		}
+				
 		logger = context.getLogger();
 		elggMetrics = new ElggDriverMetrics();
 		context.attachMetrics(elggMetrics);
@@ -126,12 +158,7 @@ public class Web20Driver {
 		homeClientList = new ArrayList<Web20Client>();
 		loggedInClientList = new ArrayList<Web20Client>();
 		activityClientList = new ArrayList<Web20Client>();
-		
-		// #TODO Read from config
-		userPasswordList = new ArrayList<UserPasswordPair>();
-		userPasswordList.add(new UserPasswordPair("tpalit", "password1234"));
-		userPasswordList.add(new UserPasswordPair("yoshen", "password1234"));
-		
+				
 		// #TODO Read from config
 		hostUrl = "http://10.22.17.101";
 		
@@ -146,7 +173,7 @@ public class Web20Driver {
 		}
 	}
 
-	private Web20Client selectRandomHomePageClient() {
+	private synchronized Web20Client selectRandomHomePageClient() {
 		if (homeClientList.size() > 0) {
 			Random random = new Random();
 			int randomIndex = random.nextInt(homeClientList.size());
@@ -156,7 +183,7 @@ public class Web20Driver {
 		}
 	}
 	
-	private Web20Client selectRandomActivityPageClient() {
+	private synchronized Web20Client selectRandomActivityPageClient() {
 		if (activityClientList.size() > 0) {
 			Random random = new Random();
 			int randomIndex = random.nextInt(activityClientList.size());
@@ -166,7 +193,7 @@ public class Web20Driver {
 		}
 	}
 	
-	private Web20Client selectRandomLoggedInClient() {
+	private synchronized Web20Client selectRandomLoggedInClient() {
 		if (loggedInClientList.size() > 0) {
 			Random random = new Random();
 			int randomIndex = random.nextInt(loggedInClientList.size());

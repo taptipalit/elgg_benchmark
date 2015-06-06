@@ -71,6 +71,7 @@
 
     <target name="run" depends="bench.jar" 
         description="Test runs the benchmark outside the Faban Harness">
+    	 <!-- com.sun.faban.driver.engine.MasterImpl -->
         <java classname="com.sun.faban.driver.engine.MasterImpl"
               classpathref="classpath"
               fork="true"

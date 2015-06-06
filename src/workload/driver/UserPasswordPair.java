@@ -16,6 +16,9 @@ public class UserPasswordPair {
 		this.password = password;
 	}
 	
+	public UserPasswordPair() {
+	}
+
 	public String getUserName() {
 		return userName;
 	}
