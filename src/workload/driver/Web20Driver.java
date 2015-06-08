@@ -11,7 +11,6 @@ import java.util.logging.Logger;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.Text;
 
 import com.sun.faban.driver.BenchmarkDefinition;
 import com.sun.faban.driver.BenchmarkDriver;
