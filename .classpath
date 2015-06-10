@@ -7,6 +7,6 @@
 	<classpathentry kind="lib" path="lib/commons-logging.jar"/>
 	<classpathentry kind="lib" path="lib/fabanagents.jar"/>
 	<classpathentry kind="lib" path="lib/fabancommon.jar"/>
-	<classpathentry kind="lib" path="lib/fabandriver.jar"/>
+	<classpathentry kind="lib" path="lib/fabandriver.jar" sourcepath="/home/tpalit/Documents/faban/src.zip"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -1,12 +1,16 @@
 package workload.driver;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -52,6 +56,10 @@ public class Web20Driver {
 
 	private DriverContext context;
 	private Logger logger;
+	private FileHandler fileTxt;
+
+	private SimpleFormatter formatterTxt;
+	  
 	private ElggDriverMetrics elggMetrics;
 	
 	private String hostUrl;
@@ -63,11 +71,13 @@ public class Web20Driver {
 	 */
 	
 	/**
-	 * The userPasswordList consists of all the available users and their passwords. When new users are created
-	 * they are added to this.
+	 * The userPasswordList consists of all the available users and their passwords. This is read from the run.xml file.
 	 * 
+	 * DONOT use this directly. This is not synchronized among the agent threads. Use myUserPasswordList
 	 */
 	private List<UserPasswordPair> userPasswordList;
+	private List<UserPasswordPair> myUserPasswordList;
+	
 	private int userPasswordIndex;
 	
 	/**
@@ -120,11 +130,20 @@ public class Web20Driver {
 	private final String RIVER_UPDATE_URL = "/activity/proc/updateriver";
 	private final String WALL_URL = "/action/wall/status";
 	
-	public Web20Driver() throws MalformedURLException {
+	public Web20Driver() throws SecurityException, IOException {
 		
 		context = DriverContext.getContext();
-		
 		userPasswordList = new ArrayList<UserPasswordPair>();
+		myUserPasswordList = new ArrayList<UserPasswordPair>();
+		
+		logger = context.getLogger();
+		logger.setLevel(Level.FINE);
+	    fileTxt = new FileHandler("Logging.txt");
+	    formatterTxt = new SimpleFormatter();
+	    fileTxt.setFormatter(formatterTxt);
+	    logger.addHandler(fileTxt);
+
+
 		Element properties = context.getPropertiesNode();
 		NodeList propList = properties.getChildNodes();
 		for (int i = 0; i < propList.getLength(); i++) {
@@ -150,7 +169,22 @@ public class Web20Driver {
 			}
 		}
 				
-		logger = context.getLogger();
+		// Partition the userPasswordList by the number of threads. 
+		int partitionSize = userPasswordList.size() / context.getScale();
+		int startIndex = (context.getThreadId() % context.getScale()) * partitionSize;
+		int endIndex = startIndex + partitionSize;
+		for (int i = startIndex; i < endIndex && i < userPasswordList.size(); i++) {
+			myUserPasswordList.add(userPasswordList.get(i));
+		}
+		
+		StringBuffer logBuffer = new StringBuffer();
+		logBuffer.append("Thread id = "+context.getThreadId()+" has start and end index as "+startIndex + " "+endIndex);
+		logBuffer.append("Thread will work with the following users: \n");
+		for (UserPasswordPair u: myUserPasswordList) {
+			logBuffer.append(u.getUserName()+"\n");
+		}
+		logger.fine(logBuffer.toString());
+		
 		elggMetrics = new ElggDriverMetrics();
 		context.attachMetrics(elggMetrics);
 		
@@ -165,8 +199,8 @@ public class Web20Driver {
 	}
 	
 	private UserPasswordPair selectNextUsernamePassword() {
-		if (++userPasswordIndex < userPasswordList.size()) {
-			return userPasswordList.get(userPasswordIndex);
+		if (++userPasswordIndex < myUserPasswordList.size()) {
+			return myUserPasswordList.get(userPasswordIndex);
 		} else {
 			return null;
 		}
@@ -176,7 +210,10 @@ public class Web20Driver {
 		if (homeClientList.size() > 0) {
 			Random random = new Random();
 			int randomIndex = random.nextInt(homeClientList.size());
-			return homeClientList.get(randomIndex);
+			Web20Client client = homeClientList.get(randomIndex);
+			logger.fine("Thread Id : " +context.getThreadId() + " removing from home page : "+ client.getUsername());
+			homeClientList.remove(client);
+			return client;
 		} else {
 			return null;
 		}
@@ -266,6 +303,7 @@ public class Web20Driver {
 			http.addTextType("application/xml");
 			http.addTextType("q=0.9,*/*");
 			http.addTextType("q=0.8");
+			
 			client.setHttp(http);
 			
 	        StringBuilder sb = http.fetchURL(hostUrl+ROOT_URL);
@@ -320,27 +358,42 @@ public class Web20Driver {
 	
 			client.getHttp().fetchURL(hostUrl+LOGIN_URL, postRequest, headers);
 			// We should get a redirect to the ROOT URL which we should try to GET
-			assert (client.getHttp().getResponseCode() == 302);
+			assert client.getHttp().getResponseCode() == 302;
 			String locations[] = client.getHttp().getResponseHeader("Location");
-			assert ((hostUrl+ROOT_URL).equals(locations[0]));
-			client.getHttp().fetchURL(hostUrl+ROOT_URL);
-			assert (client.getHttp().getResponseCode() == 302);
-			locations = client.getHttp().getResponseHeader("Location");
-			// We should a redirect to the ACTIVITY URL
-			assert ((hostUrl+ACTIVITY_URL).equals(locations[0]));
-			StringBuilder sb = client.getHttp().fetchURL(hostUrl+ACTIVITY_URL);
-	        updateElggTokenAndTs(client, sb);
-	//		System.out.println(sb);
-			for (String url: ACTIVITY_URLS) {
-				client.getHttp().fetchURL(hostUrl+url);
+			
+			// assert  (hostUrl+ROOT_URL).equals(locations[0]) : "Login failed for user: "+client.getUsername();
+			if ((hostUrl+ROOT_URL).equals(locations[0])) {
+				logger.fine("Login succeeded for user: "+client.getUsername());
+				client.getHttp().fetchURL(hostUrl+ROOT_URL);
+				assert client.getHttp().getResponseCode() == 302;
+				try {
+					locations = client.getHttp().getResponseHeader("Location");
+				} catch (Exception e) {
+					logger.fine("Login error for id = "+client.getUsername());
+					throw e;
+				}
+				// We should a redirect to the ACTIVITY URL
+				assert ((hostUrl+ACTIVITY_URL).equals(locations[0]));
+				StringBuilder sb = client.getHttp().fetchURL(hostUrl+ACTIVITY_URL);
+		        updateElggTokenAndTs(client, sb);
+		//		System.out.println(sb);
+				for (String url: ACTIVITY_URLS) {
+					client.getHttp().fetchURL(hostUrl+url);
+				}
+				assert (client.getHttp().getResponseCode() == 200);
+		        
+		        loggedInClientList.add(client);
+		        activityClientList.add(client);
+		        //homeClientList.remove(client);
+		        
+		        success = true;
+
+			} else {
+				logger.fine("Login failed for user: "+client.getUsername());
+				// Dump the contents
+				StringBuilder sb = client.getHttp().fetchURL(locations[0]);
+				logger.fine(sb.toString());
 			}
-			assert (client.getHttp().getResponseCode() == 200);
-	        
-	        loggedInClientList.add(client);
-	        activityClientList.add(client);
-	        homeClientList.remove(client);
-	        
-	        success = true;
 
 		}
 		context.recordTime();
