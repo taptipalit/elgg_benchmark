@@ -1,7 +1,10 @@
 package workload.driver;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,7 +15,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -137,38 +139,20 @@ public class Web20Driver {
 		myUserPasswordList = new ArrayList<UserPasswordPair>();
 		
 		logger = context.getLogger();
-		logger.setLevel(Level.FINE);
+		logger.setLevel(Level.INFO);
 	    fileTxt = new FileHandler("Logging.txt");
 	    formatterTxt = new SimpleFormatter();
 	    fileTxt.setFormatter(formatterTxt);
 	    logger.addHandler(fileTxt);
 
-
-		Element properties = context.getPropertiesNode();
-		NodeList propList = properties.getChildNodes();
-		for (int i = 0; i < propList.getLength(); i++) {
-			Node property =  propList.item(i);
-			if (property instanceof Node) {
-				Node element = (Node) property;
-				if(!"#text".equals(element.getNodeName())) {
-					UserPasswordPair pair = new UserPasswordPair();
-					NodeList elemChildren = element.getChildNodes();
-					for (int j = 0; j < elemChildren.getLength(); j++) {
-						Node property2 = elemChildren.item(j);
-						if (property2 instanceof Node) {
-							Node element2 = (Node) property2;
-							if ("username".equals(element2.getNodeName())) {
-								pair.setUserName(element2.getTextContent());
-							} else if ("password".equals(element2.getNodeName())) {
-								pair.setPassword(element2.getTextContent());
-							}
-						}
-					}
-					userPasswordList.add(pair);
-				}
-			}
-		}
-				
+	    BufferedReader bw = new BufferedReader(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("users.txt")));
+	    String line;
+	    while ((line = bw.readLine()) != null) {
+	    	String tokens[] = line.split(" ");
+	    	UserPasswordPair pair = new UserPasswordPair(tokens[0], tokens[1]);
+	    	userPasswordList.add(pair);
+	    }
+		bw.close();
 		// Partition the userPasswordList by the number of threads. 
 		int partitionSize = userPasswordList.size() / context.getScale();
 		int startIndex = (context.getThreadId() % context.getScale()) * partitionSize;
@@ -303,6 +287,7 @@ public class Web20Driver {
 			http.addTextType("application/xml");
 			http.addTextType("q=0.9,*/*");
 			http.addTextType("q=0.8");
+			http.setFollowRedirects(true);
 			
 			client.setHttp(http);
 			
@@ -356,45 +341,12 @@ public class Web20Driver {
 			headers.put("Referer", hostUrl+"/");
 			headers.put("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 	
-			client.getHttp().fetchURL(hostUrl+LOGIN_URL, postRequest, headers);
-			// We should get a redirect to the ROOT URL which we should try to GET
-			assert client.getHttp().getResponseCode() == 302;
-			String locations[] = client.getHttp().getResponseHeader("Location");
-			
-			// assert  (hostUrl+ROOT_URL).equals(locations[0]) : "Login failed for user: "+client.getUsername();
-			if ((hostUrl+ROOT_URL).equals(locations[0])) {
-				logger.fine("Login succeeded for user: "+client.getUsername());
-				client.getHttp().fetchURL(hostUrl+ROOT_URL);
-				assert client.getHttp().getResponseCode() == 302;
-				try {
-					locations = client.getHttp().getResponseHeader("Location");
-				} catch (Exception e) {
-					logger.fine("Login error for id = "+client.getUsername());
-					throw e;
-				}
-				// We should a redirect to the ACTIVITY URL
-				assert ((hostUrl+ACTIVITY_URL).equals(locations[0]));
-				StringBuilder sb = client.getHttp().fetchURL(hostUrl+ACTIVITY_URL);
-		        updateElggTokenAndTs(client, sb);
-		//		System.out.println(sb);
-				for (String url: ACTIVITY_URLS) {
-					client.getHttp().fetchURL(hostUrl+url);
-				}
-				assert (client.getHttp().getResponseCode() == 200);
-		        
-		        loggedInClientList.add(client);
-		        activityClientList.add(client);
-		        //homeClientList.remove(client);
-		        
-		        success = true;
-
-			} else {
-				logger.fine("Login failed for user: "+client.getUsername());
-				// Dump the contents
-				StringBuilder sb = client.getHttp().fetchURL(locations[0]);
-				logger.fine(sb.toString());
-			}
-
+			StringBuilder sb = client.getHttp().fetchURL(hostUrl+LOGIN_URL, postRequest, headers);
+			logger.fine(sb.toString());
+			logger.fine(""+client.getHttp().getResponseCode());
+			loggedInClientList.add(client);
+	        activityClientList.add(client);
+			success = true;
 		}
 		context.recordTime();
 		if (context.isTxSteadyState()) {

@@ -83,10 +83,7 @@ public class UserGenerator {
 			entity.setPassword(password);
 			entity.setUserName(userName);
 			userList.add(entity);
-			pw.println("<entry"+i+">");
-			pw.println("<username>"+userName+"</username>");
-			pw.println("<password>"+password+"</password>");
-			pw.println("</entry"+i+">");
+			pw.println(userName+" "+password);
 		}
 		pw.println("</properties>");
 		pw.flush();
@@ -147,6 +144,48 @@ public class UserGenerator {
 		gen.generateUsers();
 		gen.createUsers();
 	}
+	
+	/*
+	public static void main(String[] pp) throws Exception {
+		List<UserPasswordPair> userPasswordList = new ArrayList<UserPasswordPair>();
+		File fXmlFile = new File("./users.xml");
+		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+		Document doc = dBuilder.parse(fXmlFile);
+		
+		Element properties = doc.getDocumentElement();
+		NodeList propList = properties.getChildNodes();
+		for (int i = 0; i < propList.getLength(); i++) {
+			Node property =  propList.item(i);
+			if (property instanceof Node) {
+				Node element = (Node) property;
+				if(!"#text".equals(element.getNodeName())) {
+					UserPasswordPair pair = new UserPasswordPair();
+					NodeList elemChildren = element.getChildNodes();
+					for (int j = 0; j < elemChildren.getLength(); j++) {
+						Node property2 = elemChildren.item(j);
+						if (property2 instanceof Node) {
+							Node element2 = (Node) property2;
+							if ("username".equals(element2.getNodeName())) {
+								pair.setUserName(element2.getTextContent());
+							} else if ("password".equals(element2.getNodeName())) {
+								pair.setPassword(element2.getTextContent());
+							}
+						}
+					}
+					userPasswordList.add(pair);
+				}
+			}
+		}
+		
+		File outFile = new File("users.txt");
+		PrintWriter pw = new PrintWriter(outFile);
+		for (UserPasswordPair up: userPasswordList) {
+			pw.println(up.getUserName()+" "+up.getPassword());
+		}
+		pw.close();
+	}
+	*/
 }
 
 class RandomStringGenerator {
