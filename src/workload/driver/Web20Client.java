@@ -12,8 +12,10 @@ public class Web20Client {
 	
 	private String elggToken;
 	private String elggTs;
-	private String username="tpalit";
-	private String password="password12345";
+	private String username;
+	private String password;
+	private String guid;
+	
 	private HttpTransport http;
 	
 	public String getElggToken() {
@@ -45,6 +47,12 @@ public class Web20Client {
 	}
 	public void setHttp(HttpTransport http) {
 		this.http = http;
+	}
+	public String getGuid() {
+		return guid;
+	}
+	public void setGuid(String guid) {
+		this.guid = guid;
 	}
 
 	

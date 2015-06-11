@@ -1,8 +1,6 @@
 package workload.driver;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -15,9 +13,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
 import com.sun.faban.driver.BenchmarkDefinition;
 import com.sun.faban.driver.BenchmarkDriver;
 import com.sun.faban.driver.BenchmarkOperation;
@@ -28,6 +23,7 @@ import com.sun.faban.driver.FlatMix;
 import com.sun.faban.driver.HttpTransport;
 import com.sun.faban.driver.NegativeExponential;
 import com.sun.faban.driver.Timing;
+import org.json.*;
 
 @BenchmarkDefinition(name = "Elgg benchmark", version = "0.1")
 
@@ -45,7 +41,7 @@ import com.sun.faban.driver.Timing;
 
 @NegativeExponential (
 		cycleDeviation = 2,
-		cycleMean = 500, //0.5 seconds
+		cycleMean = 100, //0.5 seconds
 		cycleType = CycleType.THINKTIME) // cycle time or think time - count from the start of prev operation or end
 
 /**
@@ -154,8 +150,8 @@ public class Web20Driver {
 	    }
 		bw.close();
 		// Partition the userPasswordList by the number of threads. 
-		int partitionSize = userPasswordList.size() / context.getScale();
-		int startIndex = (context.getThreadId() % context.getScale()) * partitionSize;
+		int partitionSize = (context.getScale() > 0? userPasswordList.size() / context.getScale() : userPasswordList.size()) ;
+		int startIndex = ( context.getScale() > 0 ? (context.getThreadId() % context.getScale()) * partitionSize: 0  );
 		int endIndex = startIndex + partitionSize;
 		for (int i = startIndex; i < endIndex && i < userPasswordList.size(); i++) {
 			myUserPasswordList.add(userPasswordList.get(i));
@@ -224,19 +220,31 @@ public class Web20Driver {
 	}
 	
 	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb) {
-        // Get the token values
-        int elggTokenStartIndex = sb.indexOf("\"__elgg_token\":\"") + "\"__elgg_token\":\"".length();
-        int elggTokenEndIndex = sb.indexOf("\"", elggTokenStartIndex);
-        String elggToken = sb.substring(elggTokenStartIndex, elggTokenEndIndex);
-        //System.out.println("Elgg Token = "+elggToken);
-        
-        int elggTsStartIndex = sb.indexOf("\"__elgg_ts\":") + "\"__elgg_ts\":".length();
-        int elggTsEndIndex = sb.indexOf(",", elggTsStartIndex);
-        String elggTs = sb.substring(elggTsStartIndex, elggTsEndIndex);
-        //System.out.println("Elgg Ts = "+elggTs);
-        
+		
+		// Get the Json
+		int startIndex = sb.indexOf("var elgg = ");
+		int endIndex = sb.indexOf(";", startIndex);
+		String elggJson = sb.substring(startIndex+"var elgg = ".length(), endIndex);
+		System.out.println(elggJson);
+		
+		JSONObject elgg = new JSONObject(elggJson);
+		JSONObject securityToken = elgg.getJSONObject("security").getJSONObject("token");
+		String elggToken = securityToken.getString("__elgg_token");
+		Long elggTs = securityToken.getLong("__elgg_ts");
+
+		System.out.println("Elgg Token = "+elggToken);
+        System.out.println("Elgg Ts = "+elggTs);
         client.setElggToken(elggToken);
-        client.setElggTs(elggTs);
+        client.setElggTs(elggTs.toString());
+        
+        if (!elgg.getJSONObject("session").isNull("user")) {
+        	JSONObject userSession = elgg.getJSONObject("session").getJSONObject("user");
+    		Integer elggGuid = userSession.getInt("guid");
+    		//var elgg = {"config":{"lastcache":1433352491,"viewtype":"default","simplecache_enabled":1},"security":{"token":{"__elgg_ts":1434062648,"__elgg_token":"5e435f7859b03068395b986c5b257334"}},"session":{"user":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en","admin":false}},"page_owner":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en"}};
+            System.out.println("Guid = "+elggGuid);
+
+            client.setGuid(elggGuid.toString());
+        }
 	}
 	
 	@BenchmarkOperation (
@@ -342,7 +350,9 @@ public class Web20Driver {
 			headers.put("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 	
 			StringBuilder sb = client.getHttp().fetchURL(hostUrl+LOGIN_URL, postRequest, headers);
+			//System.out.println(sb.toString());
 			logger.fine(sb.toString());
+			updateElggTokenAndTs(client, sb);
 			logger.fine(""+client.getHttp().getResponseCode());
 			loggedInClientList.add(client);
 	        activityClientList.add(client);
@@ -381,8 +391,8 @@ public class Web20Driver {
 				client.getHttp().fetchURL(hostUrl+url);
 			}
 		}
-		String status = "Test";
-		String postRequest = "__elgg_token="+client.getElggToken()+"&__elgg_ts="+client.getElggTs()+"&status="+status+"&address=&access_id=2&origin=wall&container_guid=48";
+		String status = "Hello world! "+new Long(System.currentTimeMillis()).toString();
+		String postRequest = "__elgg_token="+client.getElggToken()+"&__elgg_ts="+client.getElggTs()+"&status="+status+"&address=&access_id=2&origin=wall&container_guid="+client.getGuid();
 
 		Map<String, String> headers = new HashMap<String, String>();
 		headers.put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -391,13 +401,8 @@ public class Web20Driver {
 		headers.put("Referer", hostUrl+"/activity");
 		headers.put("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 
-		client.getHttp().fetchURL(hostUrl+WALL_URL, postRequest, headers);
-		if (client.getHttp().getResponseCode() == 302) {
-			String[] location = client.getHttp().getResponseHeader("Location");
-			//System.out.println("Forwarding to "+location[0]);
-			StringBuilder sb = client.getHttp().fetchURL(location[0]);
-	        updateElggTokenAndTs(client, sb);
-		}
+		StringBuilder sb = client.getHttp().fetchURL(hostUrl+WALL_URL, postRequest, headers);
+		updateElggTokenAndTs(client, sb);
 		success = true;
 		context.recordTime();
 		
@@ -408,6 +413,29 @@ public class Web20Driver {
 
 	}
 	
+	@BenchmarkOperation (
+			name = "Register",
+			max90th = 10.0, // Fail if 90th percentile crosses 2 seconds
+			timing = Timing.MANUAL
+			)
+	public void register() throws Exception {
+		boolean success = false;
+		context.recordTime();
+		Web20Client client = selectRandomActivityPageClient();
+		if (null != client) {
+			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=2"; // #TODO - What on earth is this?
+			StringBuilder sb = client.getHttp().fetchURL(hostUrl+RIVER_UPDATE_URL, postString);
+			success = true;
+			
+		}
+		context.recordTime();
+		if (context.isTxSteadyState()) {
+			if (success)
+				elggMetrics.attemptUpdateActivityCnt++;
+		}
+
+	}
+
 	static class ElggDriverMetrics implements CustomMetrics {
 
 		int attemptLoginCnt = 0;
