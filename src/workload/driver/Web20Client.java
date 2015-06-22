@@ -14,6 +14,7 @@ public class Web20Client {
 	private String elggTs;
 	private String username;
 	private String password;
+	private String email;
 	private String guid;
 	
 	private HttpTransport http;
@@ -53,6 +54,12 @@ public class Web20Client {
 	}
 	public void setGuid(String guid) {
 		this.guid = guid;
+	}
+	public String getEmail() {
+		return email;
+	}
+	public void setEmail(String email) {
+		this.email = email;
 	}
 
 	
