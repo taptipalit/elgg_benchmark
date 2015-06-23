@@ -17,6 +17,8 @@ public class Web20Client {
 	private String email;
 	private String guid;
 	
+	private ChatPair chattingPair;
+	
 	private HttpTransport http;
 	
 	public String getElggToken() {
@@ -60,6 +62,12 @@ public class Web20Client {
 	}
 	public void setEmail(String email) {
 		this.email = email;
+	}
+	public ChatPair getChattingPair() {
+		return chattingPair;
+	}
+	public void setChattingPair(ChatPair chattingPair) {
+		this.chattingPair = chattingPair;
 	}
 
 	
