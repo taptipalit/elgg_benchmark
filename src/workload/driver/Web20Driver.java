@@ -3,7 +3,9 @@ package workload.driver;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+
+import org.json.JSONObject;
 
 import com.sun.faban.driver.BenchmarkDefinition;
 import com.sun.faban.driver.BenchmarkDriver;
@@ -23,8 +27,6 @@ import com.sun.faban.driver.FlatMix;
 import com.sun.faban.driver.HttpTransport;
 import com.sun.faban.driver.NegativeExponential;
 import com.sun.faban.driver.Timing;
-
-import org.json.*;
 
 
 @BenchmarkDefinition(name = "Elgg benchmark", version = "0.1")
@@ -43,7 +45,7 @@ import org.json.*;
 
 @NegativeExponential (
 		cycleDeviation = 2,
-		cycleMean = 100, //0.5 seconds
+		cycleMean = 1000, //1 seconds
 		cycleType = CycleType.THINKTIME) // cycle time or think time - count from the start of prev operation or end
 
 /**
@@ -133,7 +135,7 @@ public class Web20Driver {
 	private final String REGISTER_PAGE_URL = "/register";
 	
 	private final String DO_REGISTER_URL = "/action/register";
-	private final String DO_ADD_FRIEND = "/actions/friends/add";
+	private final String DO_ADD_FRIEND = "/action/friends/add";
 	
 	public Web20Driver() throws SecurityException, IOException {
 		
@@ -248,7 +250,7 @@ public class Web20Driver {
         	JSONObject userSession = elgg.getJSONObject("session").getJSONObject("user");
     		Integer elggGuid = userSession.getInt("guid");
     		//var elgg = {"config":{"lastcache":1433352491,"viewtype":"default","simplecache_enabled":1},"security":{"token":{"__elgg_ts":1434062648,"__elgg_token":"5e435f7859b03068395b986c5b257334"}},"session":{"user":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en","admin":false}},"page_owner":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en"}};
-            System.out.println("Guid = "+elggGuid);
+            // System.out.println("Guid = "+elggGuid);
 
             client.setGuid(elggGuid.toString());
         }
@@ -382,29 +384,22 @@ public class Web20Driver {
 			timing = Timing.MANUAL
 			)
 	public void addFriend() throws Exception {
-		boolean success = true;
-		// Find two users
+		boolean success = false;
+		context.recordTime();
 		Web20Client friender = selectRandomLoggedInClient();
-		Web20Client friendee = selectRandomLoggedInClient();
-		int numTries = 1;
-		while (friender == friendee || null == friender.getGuid() || null == friendee.getGuid()) {
-			if (++numTries > loggedInClientList.size()) {
-				success = false;
-				break;
-			}
-			friender = selectRandomLoggedInClient();
-			friendee = selectRandomLoggedInClient();
+		if (null != friender) {
+			int friendeeGuid = new Random().nextInt(userPasswordList.size());
+			String postString = "friend="+friendeeGuid+"&__elgg_ts"+friender.getElggTs()+"&__elgg_token"+friender.getElggToken();
+			friender.getHttp().fetchURL(hostUrl+DO_ADD_FRIEND+"?"+postString, postString);
+			success = true;
 		}
 		context.recordTime();
 		if (success) {
-			String postString = "friend="+friendee.getGuid()+"&__elgg_ts"+friender.getElggTs()+"&__elgg_token"+friender.getElggToken();
-			friender.getHttp().fetchURL(hostUrl+DO_ADD_FRIEND, postString);
 			if (context.isTxSteadyState()) {
-					elggMetrics.attemptAddFriendsCnt++;
+				elggMetrics.attemptAddFriendsCnt++;
 			}
-
 		}
-		context.recordTime();
+
 	}
 	
 	/**
@@ -432,7 +427,7 @@ public class Web20Driver {
 				client.getHttp().fetchURL(hostUrl+url);
 			}
 		}
-		String status = "Hello world! "+new Long(System.currentTimeMillis()).toString();
+		String status = "Hello world! "+new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date());
 		String postRequest = "__elgg_token="+client.getElggToken()+"&__elgg_ts="+client.getElggTs()+"&status="+status+"&address=&access_id=2&origin=wall&container_guid="+client.getGuid();
 
 		Map<String, String> headers = new HashMap<String, String>();
@@ -569,6 +564,7 @@ public class Web20Driver {
         	clone.attemptLoginCnt = this.attemptLoginCnt;
         	clone.attemptPostWallCnt = this.attemptPostWallCnt;
         	clone.attemptUpdateActivityCnt = this.attemptUpdateActivityCnt;
+        	clone.attemptAddFriendsCnt = this.attemptAddFriendsCnt;
             return clone;
         }
 	}
