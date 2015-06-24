@@ -15,6 +15,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
+import javax.xml.xpath.XPathExpressionException;
+
 import org.json.JSONObject;
 
 import workload.driver.RandomStringGenerator.Mode;
@@ -41,16 +43,23 @@ import com.sun.faban.driver.Timing;
 /**
  * The mix of operations and their proabilities.
  */
-@FlatMix(mix = { 5, 5, 30, 35, 10, 10, 5 }, 
-		operations = { "AccessHomepage",
-						"DoLogin", 
-						"PostSelfWall", 
-						"UpdateActivity",
-						"SendChatMessage",
-						"AddFriend", 
-						"Register" }, 
-		deviation = 5)
 
+@FlatMix(mix = { 5, 5, 15, 20, 20, 20, 10, 5 }, 
+		operations = { "AccessHomepage", /* 5 */
+						"DoLogin",  /* 5 */
+						"PostSelfWall", /* 15 */
+						"UpdateActivity", /* 20% */
+						"SendChatMessage", /* 20% */
+						"ReceiveChatMessage", /* 20% */
+						"AddFriend", /* 10 */
+						"Register" /* 5 */}, 
+		deviation = 5)
+/*
+@FlatMix(mix = { 50,50 }, 
+operations = { "AccessHomepage",
+				"DoLogin"}, 
+deviation = 5)
+*/
 @NegativeExponential(cycleDeviation = 2, 
 						cycleMean = 1000, // 1 seconds
 						cycleType = CycleType.THINKTIME)
@@ -67,7 +76,7 @@ import com.sun.faban.driver.Timing;
  * Wall post (X)
  * New blog post 
  * Send friend request (X)
- * Send chat message
+ * Send chat message (X)
  * Receive chat message
  * Update live feed (X)
  * Refresh security token
@@ -165,20 +174,11 @@ public class Web20Driver {
 	private final String DO_REGISTER_URL = "/action/register";
 	private final String DO_ADD_FRIEND = "/action/friends/add";
 	
-	private final String CHAT_PAGE_URL = "/chat/notifier";
-	private final String[] CHAT_PAGE_URLS = new String[] {
-			"/chat/add",
-			"/mod/ckeditor/vendors/ckeditor/ckeditor.js",
-			"/mod/ckeditor/vendors/ckeditor/adapters/jquery.js",
-			"/mod/ckeditor/vendors/ckeditor/skins/moono/editor_gecko.css",
-			"/mod/ckeditor/vendors/ckeditor/lang/en.js",
-			"/mod/ckeditor/vendors/ckeditor/styles.js",
-			"/mod/ckeditor/vendors/ckeditor/plugins/wordcount/css/wordcount.css"
-	};
-	private final String CHAT_SAVE_URL = "/action/chat/save";
-	private final String CHAT_SEND_URL = "/action/chat/message/save";
+	private final String CHAT_CREATE_URL = "/action/elggchat/create";
+	private final String CHAT_POST_URL = "/action/elggchat/post_message";
+	private final String CHAT_RECV_URL = "/action/elggchat/poll";
 	
-	public Web20Driver() throws SecurityException, IOException {
+	public Web20Driver() throws SecurityException, IOException, XPathExpressionException {
 
 		context = DriverContext.getContext();
 		userPasswordList = new ArrayList<UserPasswordPair>();
@@ -199,7 +199,14 @@ public class Web20Driver {
 			UserPasswordPair pair = new UserPasswordPair(tokens[0], tokens[1]);
 			userPasswordList.add(pair);
 		}
+		
+		/*
+		myUserPasswordList.add(new UserPasswordPair("tpalit", "password1234"));
+		myUserPasswordList.add(new UserPasswordPair("yoshen", "password1234"));
+		*/
+		
 		bw.close();
+
 		// Partition the userPasswordList by the number of threads.
 		int partitionSize = (context.getScale() > 0 ? userPasswordList.size()
 				/ context.getScale() : userPasswordList.size());
@@ -222,15 +229,15 @@ public class Web20Driver {
 
 		elggMetrics = new ElggDriverMetrics();
 		context.attachMetrics(elggMetrics);
-
+		
+		
 		homeClientList = new ArrayList<Web20Client>();
 		loggedInClientList = new ArrayList<Web20Client>();
 		activityClientList = new ArrayList<Web20Client>();
 		chatPairList = new ArrayList<ChatPair>();
 		
-		// #TODO Read from config
-		hostUrl = "http://10.22.17.101";
-
+		//hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
+		hostUrl = "http://octeon";
 		userPasswordIndex = -1;
 		chatRandom = new Random();
 	}
@@ -248,7 +255,7 @@ public class Web20Driver {
 			Random random = new Random();
 			int randomIndex = random.nextInt(homeClientList.size());
 			Web20Client client = homeClientList.get(randomIndex);
-			logger.finer("Thread Id : " + context.getThreadId()
+			logger.fine("Thread Id : " + context.getThreadId()
 					+ " removing from home page : " + client.getUsername());
 			homeClientList.remove(client);
 			return client;
@@ -302,7 +309,7 @@ public class Web20Driver {
 	}
 
 
-	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb) {
+	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb, boolean updateGUID) {
 
 		// Get the Json
 		int startIndex = sb.indexOf("var elgg = ");
@@ -322,15 +329,17 @@ public class Web20Driver {
 		client.setElggToken(elggToken);
 		client.setElggTs(elggTs.toString());
 
-		if (!elgg.getJSONObject("session").isNull("user")) {
-			JSONObject userSession = elgg.getJSONObject("session")
-					.getJSONObject("user");
-			Integer elggGuid = userSession.getInt("guid");
-			// var elgg =
-			// {"config":{"lastcache":1433352491,"viewtype":"default","simplecache_enabled":1},"security":{"token":{"__elgg_ts":1434062648,"__elgg_token":"5e435f7859b03068395b986c5b257334"}},"session":{"user":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en","admin":false}},"page_owner":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en"}};
-			// System.out.println("Guid = "+elggGuid);
-
-			client.setGuid(elggGuid.toString());
+		if (updateGUID) {
+			if (!elgg.getJSONObject("session").isNull("user")) {
+				JSONObject userSession = elgg.getJSONObject("session")
+						.getJSONObject("user");
+				Integer elggGuid = userSession.getInt("guid");
+				// var elgg =
+				// {"config":{"lastcache":1433352491,"viewtype":"default","simplecache_enabled":1},"security":{"token":{"__elgg_ts":1434062648,"__elgg_token":"5e435f7859b03068395b986c5b257334"}},"session":{"user":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en","admin":false}},"page_owner":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en"}};
+				// System.out.println("Guid = "+elggGuid);
+	
+				client.setGuid(elggGuid.toString());
+			}
 		}
 	}
 
@@ -384,7 +393,7 @@ public class Web20Driver {
 
 			StringBuilder sb = http.fetchURL(hostUrl + ROOT_URL);
 
-			updateElggTokenAndTs(client, sb);
+			updateElggTokenAndTs(client, sb, false);
 			for (String url : ROOT_URLS) {
 				http.readURL(hostUrl + url);
 				// System.out.println(sb.indexOf("__elgg_token"));
@@ -434,7 +443,7 @@ public class Web20Driver {
 					postRequest, headers);
 			// System.out.println(sb.toString());
 			logger.finer(sb.toString());
-			updateElggTokenAndTs(client, sb);
+			updateElggTokenAndTs(client, sb, true);
 			logger.finer("" + client.getHttp().getResponseCode());
 			loggedInClientList.add(client);
 			activityClientList.add(client);
@@ -478,17 +487,47 @@ public class Web20Driver {
 	}
 
 	/**
+	 * Receive a chat message.
+	 */
+	@BenchmarkOperation(name = "ReceiveChatMessage", 
+			max90th = 4.0,
+			timing = Timing.MANUAL)
+	public void receiveChatMessage() throws Exception {
+		boolean success = false;
+		context.recordTime();
+		if (chatPairList.size() > 0) {
+			ChatPair chatPair = selectRandomChatPair();
+			Web20Client client1 = null;
+			if (chatRandom.nextBoolean()) {
+				client1 = chatPair.getClient1();
+			} else {
+				client1 = chatPair.getClient2();
+			}
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Accept",
+					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			headers.put("Accept-Language", "en-US,en;q=0.5");
+			headers.put("Accept-Encoding", "gzip, deflate");
+			headers.put("Referer", hostUrl + "/activity");
+			headers.put("User-Agent",
+					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			
+			client1.getHttp().fetchURL(hostUrl+"?__elgg_ts="+client1.getElggTs()+"__elgg_token="+client1.getElggToken(), headers);
+		}
+		context.recordTime();
+	}
+	/**
 	 * Send a chat message
 	 * 
 	 * @throws Exception
 	 */
 	@BenchmarkOperation(name = "SendChatMessage", 
-						max90th = 10.0,
+						max90th = 4.0,
 						timing = Timing.MANUAL)
 	public void sendChatMessage() throws Exception {
 		boolean success = false;
-		StringBuffer sb = null;
-		if (chatRandom.nextBoolean() || chatPairList.size() < 2) {
+		StringBuilder sb = null;
+		if (chatRandom.nextBoolean() ) {
 			success = startNewChat();
 		} else {
 			// Continue an existing chat conversation
@@ -509,14 +548,17 @@ public class Web20Driver {
 						"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
 				headers.put("Accept-Language", "en-US,en;q=0.5");
 				headers.put("Accept-Encoding", "gzip, deflate");
-				headers.put("Referer", hostUrl + "/chat/add");
+				headers.put("Referer", hostUrl + "/activity");
 				headers.put("User-Agent",
 						"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 
-				String postString = "__elgg_token="+client1.getElggToken()+"&__elgg_ts="+client1.getElggTs()
-						+"&message="+RandomStringGenerator.generateRandomString(20, Mode.ALPHA)
-						+"&container_guid="+chatPair.getGuid()+"&guid=&submit=Send";
-				client1.getHttp().fetchURL(hostUrl+CHAT_SEND_URL, postString, headers);
+				String postString = "chatsession="+chatPair.getGuid()+"&chatmessage="
+						+RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
+				sb = client1.getHttp().fetchURL(hostUrl+CHAT_POST_URL
+													+"?__elgg_token="+client1.getElggToken()
+													+"&__elgg_ts="+client1.getElggTs()
+												, postString, headers);
+
 			}
 			context.recordTime();
 		}
@@ -533,6 +575,8 @@ public class Web20Driver {
 		StringBuilder sb = null;
 		ChatPair chatPair = null;
 		boolean success = false;
+		
+		String postString = null;
 		// Create a new chat communication between two logged in users
 		Web20Client client1 = selectRandomLoggedInClient();
 		Web20Client client2 = selectOtherRandomLoggedInClient(client1);
@@ -554,35 +598,35 @@ public class Web20Driver {
 			client1.setChattingPair(chatPair);
 			client2.setChattingPair(chatPair);
 			
-			// Navigate to chat page
-			logger.fine("user name"+client1.getUsername());
-			logger.fine("guid"+client1.getGuid());
-			logger.fine("response headers"+client1.getHttp().dumpResponseHeaders());
-			logger.fine("ccokies"+client1.getHttp().getCookies());
-			sb = client1.getHttp().fetchURL(hostUrl+CHAT_PAGE_URL);
-			for (String chatUrl: CHAT_PAGE_URLS) {
-				client1.getHttp().fetchURL(hostUrl+chatUrl);
+			//logger.fine("response headers"+client1.getHttp().dumpResponseHeaders());
+			//logger.fine("ccokies"+client1.getHttp().getCookies());
+			try {
+				postString = "invite="+client2.getGuid()+"&__elgg_ts="+client1.getElggTs()
+						+"&__elgg_token="+client1.getElggToken();
+				sb = client1.getHttp().fetchURL(hostUrl+CHAT_CREATE_URL, postString, headers);
+				assert(client1.getHttp().getResponseCode() == 200);
+				logger.fine("ElggChat session created. Guid = "+sb.toString());
+				chatPair.setGuid(sb.toString());
+			} catch (Exception e) {
+				logger.fine("EXCEPTION!!!!!!!!!!\nClient1: \n user name: "+client1.getUsername()
+						+"\n password: "+client1.getPassword()
+						+"\n guid: "+client1.getGuid()
+						+"\nClient2: \n user name: "+client2.getUsername()
+						+"\n password: "+client2.getPassword()
+						+"\n guid: "+client2.getGuid());
+				throw e;
 			}
 			
 			headers.put("Referer", hostUrl + "/chat/add");
-
 			
-			// Start a chat conversation
-			String postString = "__elgg_token="+client1.getElggToken()+"&__elgg_ts="+client1.getElggTs()
-							+"&title="+RandomStringGenerator.generateRandomString(5, Mode.ALPHA)
-							+"&message="+RandomStringGenerator.generateRandomString(15, Mode.ALPHA)
-							+"&members="+client2.getGuid()+"&container_guid=&guid=&submit=Save";
-			// Turn off following automatic redirects because the redirected url contains the id of the chat message
-			sb = client1.getHttp().fetchURL(hostUrl+CHAT_SAVE_URL, postString, headers);
-			logger.fine(sb.toString());
-			assert(client1.getHttp().getResponseCode() == 302);
-			String redirectedUrl[] = client1.getHttp().getResponseHeader("Location");
-			chatPair.setChatUrl(redirectedUrl[0]);
-			logger.fine("New chat message: "+redirectedUrl[0]);
-			int startIndex = redirectedUrl[0].indexOf("view/")+"view/".length();
-			int endIndex = redirectedUrl[0].indexOf("/", startIndex);
-			String chatGuid = redirectedUrl[0].substring(startIndex, endIndex);
-			chatPair.setGuid(chatGuid);
+			// Send a message
+			postString = "chatsession="+chatPair.getGuid()+"&chatmessage="
+					+RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
+			sb = client1.getHttp().fetchURL(hostUrl+CHAT_POST_URL
+												+"?__elgg_token="+client1.getElggToken()
+												+"&__elgg_ts="+client1.getElggTs()
+											, postString, headers);
+			assert(client1.getHttp().getResponseCode() == 200);
 			chatPairList.add(chatPair);
 
 		}
@@ -632,7 +676,7 @@ public class Web20Driver {
 
 		StringBuilder sb = client.getHttp().fetchURL(hostUrl + WALL_URL,
 				postRequest, headers);
-		updateElggTokenAndTs(client, sb);
+		updateElggTokenAndTs(client, sb, false);
 		success = true;
 		context.recordTime();
 
@@ -668,7 +712,7 @@ public class Web20Driver {
 
 		StringBuilder sb = http.fetchURL(hostUrl + ROOT_URL);
 
-		updateElggTokenAndTs(client, sb);
+		updateElggTokenAndTs(client, sb, false);
 		for (String url : ROOT_URLS) {
 			http.readURL(hostUrl + url);
 			// System.out.println(sb.indexOf("__elgg_token"));
@@ -790,8 +834,11 @@ public class Web20Driver {
 
 	public static void main(String[] pp) throws Exception {
 		Web20Driver driver = new Web20Driver();
-		driver.register();
-
+		driver.accessHomePage();
+		driver.accessHomePage();
+		driver.doLogin();
+		driver.doLogin();
+		driver.sendChatMessage();
 	}
 	
 

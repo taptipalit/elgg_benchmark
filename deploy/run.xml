@@ -43,9 +43,10 @@
 			</stats>
 			<runtimestats target="9988" />
 		</driverConfig>
-		<serverConfig>
-			<host>10.22.17.101</host>
-			<port>80</port>
-		</serverConfig>
 	</fa:runConfig>
+	<serverConfig>
+			<host>octeon</host>
+			<port>80</port>
+	</serverConfig>
+	
 </webbenchmark>
