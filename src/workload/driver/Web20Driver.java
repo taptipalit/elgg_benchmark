@@ -236,8 +236,8 @@ public class Web20Driver {
 		activityClientList = new ArrayList<Web20Client>();
 		chatPairList = new ArrayList<ChatPair>();
 		
-		//hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
-		hostUrl = "http://octeon";
+		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
+		//hostUrl = "http://octeon";
 		userPasswordIndex = -1;
 		chatRandom = new Random();
 	}
