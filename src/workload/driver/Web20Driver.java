@@ -172,7 +172,7 @@ public class Web20Driver {
 		String line;
 		while ((line = bw.readLine()) != null) {
 			String tokens[] = line.split(" ");
-			UserPasswordPair pair = new UserPasswordPair(tokens[0], tokens[1]);
+			UserPasswordPair pair = new UserPasswordPair(tokens[0], tokens[1], tokens[2]);
 			userPasswordList.add(pair);
 		}
 		
@@ -183,10 +183,22 @@ public class Web20Driver {
 		elggMetrics = new ElggDriverMetrics();
 		context.attachMetrics(elggMetrics);
 		
-		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
-		//hostUrl = "http://octeon";
+		//hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
+		hostUrl = "http://octeon";
 		random = new Random();
 	}
+
+	private String getRandomUserGUID() {
+		int randomIndex = random.nextInt(userPasswordList.size());
+		String randomGuid = userPasswordList.get(randomIndex).getGuid();
+		while (randomGuid == thisClient.getGuid()) {
+			randomIndex = random.nextInt(userPasswordList.size());
+			randomGuid = userPasswordList.get(randomIndex).getGuid();
+		}
+		return randomGuid;
+	}
+
+
 
 	
 	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb, boolean updateGUID) {
@@ -230,6 +242,7 @@ public class Web20Driver {
 		context.recordTime();
 
 		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+			thisClient.setGuid(thisUserPasswordPair.getGuid());
 			thisClient.setUsername(thisUserPasswordPair.getUserName());
 			thisClient.setPassword(thisUserPasswordPair.getPassword());
 	
@@ -335,7 +348,7 @@ public class Web20Driver {
 		boolean success = false;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			int friendeeGuid = random.nextInt(userPasswordList.size());
+			String friendeeGuid = getRandomUserGUID();
 			String postString = "friend=" + friendeeGuid + "&__elgg_ts"
 					+ thisClient.getElggTs() + "&__elgg_token"
 					+ thisClient.getElggToken();
@@ -448,7 +461,7 @@ public class Web20Driver {
 		String chatGuid = null;
 		
 		// Create a new chat communication between two logged in users
-		int chateeGuid = random.nextInt(userPasswordList.size());
+		String chateeGuid = getRandomUserGUID();
 		
 		Map<String, String> headers = new HashMap<String, String>();
 		headers.put("Accept",
@@ -468,7 +481,7 @@ public class Web20Driver {
 		chatGuid = sb.toString();
 		thisClient.getChatSessionList().add(chatGuid);
 
-		headers.put("Referer", hostUrl + "/chat/add");
+		headers.put("Referer", hostUrl + "/activity");
 
 		// Send a message
 		postString = "chatsession=" + chatGuid + "&chatmessage="
@@ -477,6 +490,7 @@ public class Web20Driver {
 				hostUrl + CHAT_POST_URL + "?__elgg_token="
 						+ thisClient.getElggToken() + "&__elgg_ts="
 						+ thisClient.getElggTs(), postString, headers);
+		System.out.println(sb);
 		assert (thisClient.getHttp().getResponseCode() == 200);
 		
 	}

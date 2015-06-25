@@ -70,8 +70,6 @@ public class UserGenerator {
 		
 		userList = new ArrayList<UserEntity>();
 		
-		PrintWriter pw = new PrintWriter(outputFile);
-		pw.println("<properties>");
 		for (int i = 0; i<numUsers; i++) {
 			String userName = RandomStringGenerator.generateRandomString(usernameLen, RandomStringGenerator.Mode.ALPHA);
 			String password = RandomStringGenerator.generateRandomString(passwordLen, RandomStringGenerator.Mode.ALPHANUMERIC);
@@ -83,15 +81,12 @@ public class UserGenerator {
 			entity.setPassword(password);
 			entity.setUserName(userName);
 			userList.add(entity);
-			pw.println(userName+" "+password);
 		}
-		pw.println("</properties>");
-		pw.flush();
-		pw.close();
 	}
 	
 	private void createUsers() throws Exception {
 		HttpTransport http = HttpTransport.newInstance();
+		http.setFollowRedirects(true);
 		http.addTextType("application/xhtml+xml");
 		http.addTextType("application/xml");
 		http.addTextType("q=0.9,*/*");
@@ -110,7 +105,7 @@ public class UserGenerator {
 		headers.put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
 		headers.put("Accept-Language", "en-US,en;q=0.5");
 		headers.put("Accept-Encoding", "gzip, deflate");
-		headers.put("Referer", hostURL+"/");
+		headers.put("Referer", hostURL+"/admin/users/add");
 		headers.put("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 
 		sb = http.fetchURL(hostURL+"/action/login", loginPostRequest, headers);
@@ -132,9 +127,12 @@ public class UserGenerator {
 			String postRequest = "__elgg_token="+tokenTsPair.getValue1()+"&__elgg_ts="
 					+tokenTsPair.getValue2()+"&name="+user.getDisplayName()+"&username="+user.getUserName()+"&email="+user.getEmail()+"&password="+user.getPassword()
 					+"&password2="+user.getPassword()+"&admin=0";
-			headers.put("Referer", hostURL+"/action/useradd");
+			headers.put("Referer", hostURL+"/admin/users/add");
 			sb = http.fetchURL(hostURL+"/action/useradd", postRequest, headers);
-					
+			int startIndex = sb.indexOf("GUID#")+"GUID#".length();
+			int endIndex = sb.indexOf("#", startIndex);
+			String guid = sb.substring(startIndex, endIndex);
+			user.setGuid(guid);
 		}
 	}
 	
@@ -143,6 +141,21 @@ public class UserGenerator {
 		gen.loadProperties();
 		gen.generateUsers();
 		gen.createUsers();
+		gen.writeUserFile();
+	}
+
+	private void writeUserFile() throws FileNotFoundException {
+		String outputFile = properties.getProperty("output_file").trim();
+		
+		
+		PrintWriter pw = new PrintWriter(outputFile);
+		for (UserEntity entity: userList) {
+			pw.println(entity.getGuid()+" "+entity.getUserName()+" "+entity.getPassword());
+		}
+		pw.flush();
+		pw.close();
+
+		
 	}
 	
 	/*
@@ -230,6 +243,7 @@ class UserEntity {
 	private String userName;
 	private String email;
 	private String password;
+	private String guid;
 	
 	public String getDisplayName() {
 		return displayName;
@@ -254,6 +268,12 @@ class UserEntity {
 	}
 	public void setPassword(String password) {
 		this.password = password;
+	}
+	public String getGuid() {
+		return guid;
+	}
+	public void setGuid(String guid) {
+		this.guid = guid;
 	}
 	
 }

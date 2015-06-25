@@ -8,10 +8,12 @@ package workload.driver;
  */
 public class UserPasswordPair {
 
+	private String guid;
 	private String userName;
 	private String password;
 	
-	public UserPasswordPair(String userName, String password) {
+	public UserPasswordPair(String guid, String userName, String password) {
+		this.setGuid(guid);
 		this.userName = userName;
 		this.password = password;
 	}
@@ -30,6 +32,14 @@ public class UserPasswordPair {
 	}
 	public void setPassword(String password) {
 		this.password = password;
+	}
+
+	public String getGuid() {
+		return guid;
+	}
+
+	public void setGuid(String guid) {
+		this.guid = guid;
 	}
 	
 	
