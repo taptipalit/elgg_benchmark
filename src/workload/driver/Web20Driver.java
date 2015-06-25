@@ -47,36 +47,29 @@ import com.sun.faban.driver.Timing;
  * The mix of operations and their proabilities.
  */
 
-@FlatMix(mix = { 5, 5, 15, 20, 20, 20, 10, 5, 5 }, 
+@FlatMix(mix = { 5, 5, 30, 35, 15, 5, 5 }, 
 		operations = { "AccessHomepage", /* 5 */
 						"DoLogin",  /* 5 */
-						"PostSelfWall", /* 15 */
-						"UpdateActivity", /* 20% */
-						"SendChatMessage", /* 20% */
-						"ReceiveChatMessage", /* 20% */
+						"PostSelfWall", /* 35 */
+						"SendChatMessage", /* 35 */
 						"AddFriend", /* 10 */
 						"Register", /* 5 */ 
 						"Logout" /* 5 */ },
 		deviation = 5)
 
-/*
+
 @Background(operations = 
 	{ "UpdateActivity", "ReceiveChatMessage"}, 
 	timings = { 
-		@FixedTime(cycleTime = 5000, cycleDeviation = 2),
+		@FixedTime(cycleTime = 3000, cycleDeviation = 2),
 		@FixedTime(cycleTime = 1000, cycleDeviation = 2) }
 )
-*/
 
-/*
-@FlatMix(mix = { 50,50 }, 
-operations = { "AccessHomepage",
-				"DoLogin"}, 
-deviation = 5)
-*/
+
 @NegativeExponential(cycleDeviation = 2, 
-						cycleMean = 1000, // 1 seconds
+						cycleMean = 4000, // 4 seconds
 						cycleType = CycleType.THINKTIME)
+
 // cycle time or think time - count from the start of prev operation or end
 /**
  * The main driver class.
@@ -274,7 +267,6 @@ public class Web20Driver {
 		
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
-			logger.fine("Login of thread: "+context.getThreadId());
 
 			/*
 			 * To do the login, To login, we need four parameters in the POST
@@ -327,13 +319,6 @@ public class Web20Driver {
 		if (context.isTxSteadyState()) {
 			if (success) {
 				elggMetrics.attemptUpdateActivityCnt++;
-			} else {
-				if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
-					doLogin();
-				} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
-					accessHomePage();
-					doLogin();
-				}
 			}
 		}
 	}
@@ -402,14 +387,7 @@ public class Web20Driver {
 			if (context.isTxSteadyState()) {
 				elggMetrics.attemptRecvChatMessageCnt ++;
 			}
-		} else {
-			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
-				doLogin();
-			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
-				accessHomePage();
-				doLogin();
-			}
-		}
+		} 
 	}
 	/**
 	 * Send a chat message
