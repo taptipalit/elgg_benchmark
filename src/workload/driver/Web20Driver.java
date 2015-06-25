@@ -20,13 +20,16 @@ import javax.xml.xpath.XPathExpressionException;
 import org.json.JSONObject;
 
 import workload.driver.RandomStringGenerator.Mode;
+import workload.driver.Web20Client.ClientState;
 
+import com.sun.faban.driver.Background;
 import com.sun.faban.driver.BenchmarkDefinition;
 import com.sun.faban.driver.BenchmarkDriver;
 import com.sun.faban.driver.BenchmarkOperation;
 import com.sun.faban.driver.CustomMetrics;
 import com.sun.faban.driver.CycleType;
 import com.sun.faban.driver.DriverContext;
+import com.sun.faban.driver.FixedTime;
 import com.sun.faban.driver.FlatMix;
 import com.sun.faban.driver.HttpTransport;
 import com.sun.faban.driver.NegativeExponential;
@@ -44,7 +47,7 @@ import com.sun.faban.driver.Timing;
  * The mix of operations and their proabilities.
  */
 
-@FlatMix(mix = { 5, 5, 15, 20, 20, 20, 10, 5 }, 
+@FlatMix(mix = { 5, 5, 15, 20, 20, 20, 10, 5, 5 }, 
 		operations = { "AccessHomepage", /* 5 */
 						"DoLogin",  /* 5 */
 						"PostSelfWall", /* 15 */
@@ -52,8 +55,19 @@ import com.sun.faban.driver.Timing;
 						"SendChatMessage", /* 20% */
 						"ReceiveChatMessage", /* 20% */
 						"AddFriend", /* 10 */
-						"Register" /* 5 */}, 
+						"Register", /* 5 */ 
+						"Logout" /* 5 */ },
 		deviation = 5)
+
+/*
+@Background(operations = 
+	{ "UpdateActivity", "ReceiveChatMessage"}, 
+	timings = { 
+		@FixedTime(cycleTime = 5000, cycleDeviation = 2),
+		@FixedTime(cycleTime = 1000, cycleDeviation = 2) }
+)
+*/
+
 /*
 @FlatMix(mix = { 50,50 }, 
 operations = { "AccessHomepage",
@@ -77,7 +91,7 @@ deviation = 5)
  * New blog post 
  * Send friend request (X)
  * Send chat message (X)
- * Receive chat message
+ * Receive chat message (X)
  * Update live feed (X)
  * Refresh security token
  * 
@@ -85,6 +99,8 @@ deviation = 5)
  *
  */
 public class Web20Driver {
+
+	private List<UserPasswordPair> userPasswordList;
 
 	private DriverContext context;
 	private Logger logger;
@@ -96,52 +112,12 @@ public class Web20Driver {
 
 	private String hostUrl;
 
+	private UserPasswordPair thisUserPasswordPair;
 
-	/*
-	 * We can think of the users waiting at any of the pages as a "state" the
-	 * user is in. An operation can be performed only by the users which are in
-	 * a "valid" state to perform that operation. For example, we can update
-	 * River feed only for the logged in users.
-	 */
+	private Web20Client thisClient;
 
-	/**
-	 * The userPasswordList consists of all the available users and their
-	 * passwords. This is read from the run.xml file.
-	 * 
-	 * DONOT use this directly. This is not synchronized among the agent
-	 * threads. Use myUserPasswordList
-	 */
-	private List<UserPasswordPair> userPasswordList;
-	private List<UserPasswordPair> myUserPasswordList;
-
-	private int userPasswordIndex;
-
-	/**
-	 * The list of clients who are at the home page. Visiting the homepage
-	 * causes a cookie to be associated with the client.
-	 */
-	private List<Web20Client> homeClientList;
-
-	/**
-	 * The list of clients who are logged in. This could be in any of the pages
-	 * of the site.
-	 */
-	private List<Web20Client> loggedInClientList;
-
-	/**
-	 * The list of clients who are in the Activity page.
-	 */
-	private List<Web20Client> activityClientList;
-
-	/**
-	 * The list of chatting pairs.
-	 */
-	private List<ChatPair> chatPairList;
 	
-	/**
-	 * The coin to flip when to decide if we're to start a new chat or continue an existing one.
-	 */
-	private Random chatRandom; 
+	private Random random; 
 	
 	/* Constants : URL */
 	private final String ROOT_URL = "/";
@@ -179,14 +155,20 @@ public class Web20Driver {
 	private final String CHAT_POST_URL = "/action/elggchat/post_message";
 	private final String CHAT_RECV_URL = "/action/elggchat/poll";
 	
+	private final String LOGOUT_URL = "/action/logout";
+	
 	public Web20Driver() throws SecurityException, IOException, XPathExpressionException {
 
+		thisClient = new Web20Client();
+		thisClient.setClientState(ClientState.LOGGED_OUT);
+		thisClient.setChatSessionList(new ArrayList<String>());
+		
 		context = DriverContext.getContext();
 		userPasswordList = new ArrayList<UserPasswordPair>();
-		myUserPasswordList = new ArrayList<UserPasswordPair>();
 
 		logger = context.getLogger();
 		logger.setLevel(Level.FINE);
+
 		fileTxt = new FileHandler("Logging.txt");
 		formatterTxt = new SimpleFormatter();
 		fileTxt.setFormatter(formatterTxt);
@@ -201,113 +183,19 @@ public class Web20Driver {
 			userPasswordList.add(pair);
 		}
 		
-		/*
-		myUserPasswordList.add(new UserPasswordPair("tpalit", "password1234"));
-		myUserPasswordList.add(new UserPasswordPair("yoshen", "password1234"));
-		*/
-		
 		bw.close();
-
-		// Partition the userPasswordList by the number of threads.
-		int partitionSize = (context.getScale() > 0 ? userPasswordList.size()
-				/ context.getScale() : userPasswordList.size());
-		int startIndex = (context.getScale() > 0 ? (context.getThreadId() % context
-				.getScale()) * partitionSize
-				: 0);
-		int endIndex = startIndex + partitionSize;
-		for (int i = startIndex; i < endIndex && i < userPasswordList.size(); i++) {
-			myUserPasswordList.add(userPasswordList.get(i));
-		}
-
-		StringBuffer logBuffer = new StringBuffer();
-		logBuffer.append("Thread id = " + context.getThreadId()
-				+ " has start and end index as " + startIndex + " " + endIndex);
-		logBuffer.append("Thread will work with the following users: \n");
-		for (UserPasswordPair u : myUserPasswordList) {
-			logBuffer.append(u.getUserName() + "\n");
-		}
-		logger.finer(logBuffer.toString());
+		
+		thisUserPasswordPair = userPasswordList.get(context.getThreadId());
 
 		elggMetrics = new ElggDriverMetrics();
 		context.attachMetrics(elggMetrics);
 		
-		
-		homeClientList = new ArrayList<Web20Client>();
-		loggedInClientList = new ArrayList<Web20Client>();
-		activityClientList = new ArrayList<Web20Client>();
-		chatPairList = new ArrayList<ChatPair>();
-		
 		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
 		//hostUrl = "http://octeon";
-		userPasswordIndex = -1;
-		chatRandom = new Random();
+		random = new Random();
 	}
 
-	private UserPasswordPair selectNextUsernamePassword() {
-		if (++userPasswordIndex < myUserPasswordList.size()) {
-			return myUserPasswordList.get(userPasswordIndex);
-		} else {
-			return null;
-		}
-	}
-
-	private synchronized Web20Client selectRandomHomePageClient() {
-		if (homeClientList.size() > 0) {
-			Random random = new Random();
-			int randomIndex = random.nextInt(homeClientList.size());
-			Web20Client client = homeClientList.get(randomIndex);
-			homeClientList.remove(client);
-			return client;
-		} else {
-			return null;
-		}
-	}
-
-	private synchronized Web20Client selectRandomActivityPageClient() {
-		if (activityClientList.size() > 0) {
-			Random random = new Random();
-			int randomIndex = random.nextInt(activityClientList.size());
-			return activityClientList.get(randomIndex);
-		} else {
-			return null;
-		}
-	}
-
-	private synchronized Web20Client selectRandomLoggedInClient() {
-		if (loggedInClientList.size() > 0) {
-			Random random = new Random();
-			int randomIndex = random.nextInt(loggedInClientList.size());
-			return loggedInClientList.get(randomIndex);
-		} else {
-			return null;
-		}
-	}
-
-	private synchronized Web20Client selectOtherRandomLoggedInClient(Web20Client client) {
-		if (loggedInClientList.size() < 2) {
-			return null;
-		}
-		Web20Client otherClient = null;
-		Random random = new Random();
-		int randomIndex = -1;
-		while (otherClient == client || null == otherClient) {
-			randomIndex = random.nextInt(loggedInClientList.size());
-			otherClient = loggedInClientList.get(randomIndex);
-		}
-		return otherClient;
-	}
 	
-	private synchronized ChatPair selectRandomChatPair() {
-		if (chatPairList.size() > 0) {
-			Random random = new Random();
-			int randomIndex = random.nextInt(chatPairList.size());
-			return chatPairList.get(randomIndex);
-		} else {
-			return null;
-		}
-	}
-
-
 	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb, boolean updateGUID) {
 
 		// Get the Json
@@ -315,7 +203,6 @@ public class Web20Driver {
 		int endIndex = sb.indexOf(";", startIndex);
 		String elggJson = sb.substring(startIndex + "var elgg = ".length(),
 				endIndex);
-		// System.out.println(elggJson);
 
 		JSONObject elgg = new JSONObject(elggJson);
 		JSONObject securityToken = elgg.getJSONObject("security")
@@ -323,8 +210,6 @@ public class Web20Driver {
 		String elggToken = securityToken.getString("__elgg_token");
 		Long elggTs = securityToken.getLong("__elgg_ts");
 
-		// System.out.println("Elgg Token = "+elggToken);
-		// System.out.println("Elgg Ts = "+elggTs);
 		client.setElggToken(elggToken);
 		client.setElggTs(elggTs.toString());
 
@@ -333,34 +218,11 @@ public class Web20Driver {
 				JSONObject userSession = elgg.getJSONObject("session")
 						.getJSONObject("user");
 				Integer elggGuid = userSession.getInt("guid");
-				// var elgg =
-				// {"config":{"lastcache":1433352491,"viewtype":"default","simplecache_enabled":1},"security":{"token":{"__elgg_ts":1434062648,"__elgg_token":"5e435f7859b03068395b986c5b257334"}},"session":{"user":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en","admin":false}},"page_owner":{"guid":274,"type":"user","subtype":"","owner_guid":274,"container_guid":0,"site_guid":1,"time_created":"2015-06-10T15:41:22-04:00","time_updated":"2015-06-10T15:41:22-04:00","url":"http:\/\/10.22.17.101\/profile\/UVuopgYrGM","name":"UVuopgYrGM","username":"UVuopgYrGM","language":"en"}};
-				// System.out.println("Guid = "+elggGuid);
-	
-				client.setGuid(elggGuid.toString());
+					client.setGuid(elggGuid.toString());
 			}
 		}
 	}
 
-	@BenchmarkOperation(name = "UpdateActivity", 
-						max90th = 10.0,
-						timing = Timing.MANUAL)
-	public void updateActivity() throws Exception {
-		boolean success = false;
-		context.recordTime();
-		Web20Client client = selectRandomActivityPageClient();
-		if (null != client) {
-			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=2"; // Note: the %5B %5D are [ and ] respectively
-			StringBuilder sb = client.getHttp().fetchURL(hostUrl + RIVER_UPDATE_URL, postString);
-			success = true;
-		}
-		context.recordTime();
-		if (context.isTxSteadyState()) {
-			if (success)
-				elggMetrics.attemptUpdateActivityCnt++;
-		}
-
-	}
 
 	@BenchmarkOperation(name = "AccessHomepage", 
 						max90th = 10.0, 
@@ -374,32 +236,27 @@ public class Web20Driver {
 		boolean success = false;
 		context.recordTime();
 
-		UserPasswordPair userPwdPair = selectNextUsernamePassword();
-		if (null != userPwdPair) {
-			Web20Client client = new Web20Client();
-
-			client.setUsername(userPwdPair.getUserName());
-			client.setPassword(userPwdPair.getPassword());
-
+		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+			thisClient.setUsername(thisUserPasswordPair.getUserName());
+			thisClient.setPassword(thisUserPasswordPair.getPassword());
+	
 			HttpTransport http = HttpTransport.newInstance();
 			http.addTextType("application/xhtml+xml");
 			http.addTextType("application/xml");
 			http.addTextType("q=0.9,*/*");
 			http.addTextType("q=0.8");
 			http.setFollowRedirects(true);
-
-			client.setHttp(http);
-
+	
+			thisClient.setHttp(http);
+			thisClient.setClientState(ClientState.AT_HOME_PAGE);
 			StringBuilder sb = http.fetchURL(hostUrl + ROOT_URL);
-
-			updateElggTokenAndTs(client, sb, false);
+	
+			updateElggTokenAndTs(thisClient, sb, false);
 			for (String url : ROOT_URLS) {
 				http.readURL(hostUrl + url);
-				// System.out.println(sb.indexOf("__elgg_token"));
 			}
 			success = true;
-
-			homeClientList.add(client);
+	
 		}
 		context.recordTime();
 		if (context.isTxSteadyState()) {
@@ -416,20 +273,22 @@ public class Web20Driver {
 		boolean success = false;
 		
 		context.recordTime();
-		Web20Client client = selectRandomHomePageClient();
-		if (null != client) {
+		if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+			logger.fine("Login of thread: "+context.getThreadId());
+
 			/*
 			 * To do the login, To login, we need four parameters in the POST
 			 * query 1. Elgg token 2. Elgg timestamp 3. user name 4. password
 			 */
-			String postRequest = "__elgg_token=" + client.getElggToken()
-					+ "&__elgg_ts=" + client.getElggTs() + "&username="
-					+ client.getUsername() + "&password="
-					+ client.getPassword();
-			// System.out.println("post request = "+postRequest);
+			String postRequest = "__elgg_token=" + thisClient.getElggToken()
+					+ "&__elgg_ts=" + thisClient.getElggTs() + "&username="
+					+ thisClient.getUsername() + "&password="
+					+ thisClient.getPassword();
+
 			for (String url : LOGIN_URLS) {
-				client.getHttp().readURL(hostUrl + url);
+				thisClient.getHttp().readURL(hostUrl + url);
 			}
+			
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
 					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -439,18 +298,43 @@ public class Web20Driver {
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 
-			StringBuilder sb = client.getHttp().fetchURL(hostUrl + LOGIN_URL,
+			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + LOGIN_URL,
 					postRequest, headers);
-			// System.out.println(sb.toString());
-			updateElggTokenAndTs(client, sb, true);
-			loggedInClientList.add(client);
-			activityClientList.add(client);
+
+			updateElggTokenAndTs(thisClient, sb, true);
+			thisClient.setClientState(ClientState.LOGGED_IN);
 			success = true;
 		}
 		context.recordTime();
 		if (context.isTxSteadyState()) {
 			if (success)
 				elggMetrics.attemptLoginCnt++;
+		}
+	}
+
+	@BenchmarkOperation(name = "UpdateActivity", max90th = 10.0, timing = Timing.MANUAL)
+	public void updateActivity() throws Exception {
+		boolean success = false;
+		context.recordTime();
+		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=2";
+			 // Note: the %5B %5D are [ and ] respectively
+			StringBuilder sb = thisClient.getHttp().fetchURL(
+					hostUrl + RIVER_UPDATE_URL, postString);
+			success = true;
+		}
+		context.recordTime();
+		if (context.isTxSteadyState()) {
+			if (success) {
+				elggMetrics.attemptUpdateActivityCnt++;
+			} else {
+				if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+					doLogin();
+				} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+					accessHomePage();
+					doLogin();
+				}
+			}
 		}
 	}
 
@@ -465,13 +349,12 @@ public class Web20Driver {
 	public void addFriend() throws Exception {
 		boolean success = false;
 		context.recordTime();
-		Web20Client friender = selectRandomLoggedInClient();
-		if (null != friender) {
-			int friendeeGuid = new Random().nextInt(userPasswordList.size());
+		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			int friendeeGuid = random.nextInt(userPasswordList.size());
 			String postString = "friend=" + friendeeGuid + "&__elgg_ts"
-					+ friender.getElggTs() + "&__elgg_token"
-					+ friender.getElggToken();
-			friender.getHttp().fetchURL(
+					+ thisClient.getElggTs() + "&__elgg_token"
+					+ thisClient.getElggToken();
+			thisClient.getHttp().fetchURL(
 					hostUrl + DO_ADD_FRIEND + "?" + postString, postString);
 			success = true;
 		}
@@ -479,6 +362,13 @@ public class Web20Driver {
 		if (success) {
 			if (context.isTxSteadyState()) {
 				elggMetrics.attemptAddFriendsCnt++;
+			}
+		} else {
+			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+				doLogin();
+			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+				accessHomePage();
+				doLogin();
 			}
 		}
 
@@ -493,14 +383,7 @@ public class Web20Driver {
 	public void receiveChatMessage() throws Exception {
 		boolean success = false;
 		context.recordTime();
-		if (chatPairList.size() > 0) {
-			ChatPair chatPair = selectRandomChatPair();
-			Web20Client client1 = null;
-			if (chatRandom.nextBoolean()) {
-				client1 = chatPair.getClient1();
-			} else {
-				client1 = chatPair.getClient2();
-			}
+		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
 					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -510,7 +393,7 @@ public class Web20Driver {
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 			
-			client1.getHttp().fetchURL(hostUrl+CHAT_RECV_URL+"?__elgg_ts="+client1.getElggTs()+"__elgg_token="+client1.getElggToken(), headers);
+			thisClient.getHttp().fetchURL(hostUrl+CHAT_RECV_URL+"?__elgg_ts="+thisClient.getElggTs()+"__elgg_token="+thisClient.getElggToken(), headers);
 			success = true;
 		}
 		context.recordTime();
@@ -518,6 +401,13 @@ public class Web20Driver {
 		if (success) {
 			if (context.isTxSteadyState()) {
 				elggMetrics.attemptRecvChatMessageCnt ++;
+			}
+		} else {
+			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+				doLogin();
+			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+				accessHomePage();
+				doLogin();
 			}
 		}
 	}
@@ -532,59 +422,56 @@ public class Web20Driver {
 	public void sendChatMessage() throws Exception {
 		boolean success = false;
 		StringBuilder sb = null;
-		if (chatRandom.nextBoolean() ) {
-			success = startNewChat();
-		} else {
-			// Continue an existing chat conversation
-			ChatPair chatPair = selectRandomChatPair();
-			context.recordTime();
-			if (null != chatPair) {
-				Web20Client client1 = null;
-				Web20Client client2 = null;
-				if (chatRandom.nextBoolean()) {
-					client1 = chatPair.getClient1();
-					client2 = chatPair.getClient2();
-				} else {
-					client1 = chatPair.getClient2();
-					client2 = chatPair.getClient1();
-				}
-				Map<String, String> headers = new HashMap<String, String>();
-				headers.put("Accept",
-						"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-				headers.put("Accept-Language", "en-US,en;q=0.5");
-				headers.put("Accept-Encoding", "gzip, deflate");
-				headers.put("Referer", hostUrl + "/activity");
-				headers.put("User-Agent",
-						"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
-
-				String postString = "chatsession="+chatPair.getGuid()+"&chatmessage="
-						+RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
-				sb = client1.getHttp().fetchURL(hostUrl+CHAT_POST_URL
-													+"?__elgg_token="+client1.getElggToken()
-													+"&__elgg_ts="+client1.getElggTs()
-												, postString, headers);
-
+		context.recordTime();
+		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			if (random.nextBoolean() || thisClient.getChatSessionList().isEmpty()) {
+				startNewChat();
+			} else {
+				// Continue an existing chat conversation
+				String chatGuid = thisClient.getChatSessionList().get(random.nextInt(thisClient.getChatSessionList().size()));
+				
+					Map<String, String> headers = new HashMap<String, String>();
+					headers.put("Accept",
+							"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+					headers.put("Accept-Language", "en-US,en;q=0.5");
+					headers.put("Accept-Encoding", "gzip, deflate");
+					headers.put("Referer", hostUrl + "/activity");
+					headers.put("User-Agent",
+							"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+	
+					String postString = "chatsession="+chatGuid+"&chatmessage="
+							+RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
+					sb = thisClient.getHttp().fetchURL(hostUrl+CHAT_POST_URL
+														+"?__elgg_token="+thisClient.getElggToken()
+														+"&__elgg_ts="+thisClient.getElggTs()
+													, postString, headers);
+					
 			}
-			context.recordTime();
+			success = true;
 		}
-		
+		context.recordTime();
 		if (success) {
 			if (context.isTxSteadyState()) {
 				elggMetrics.attemptSendChatMessageCnt ++;
 			}
+		} else {
+			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+				doLogin();
+			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+				accessHomePage();
+				doLogin();
+			}
 		}
-
 	}
 
-	private boolean startNewChat() throws Exception {
+	private void startNewChat() throws Exception {
 		StringBuilder sb = null;
-		ChatPair chatPair = null;
-		boolean success = false;
-		
 		String postString = null;
+		String chatGuid = null;
+		
 		// Create a new chat communication between two logged in users
-		Web20Client client1 = selectRandomLoggedInClient();
-		Web20Client client2 = selectOtherRandomLoggedInClient(client1);
+		int chateeGuid = random.nextInt(userPasswordList.size());
+		
 		Map<String, String> headers = new HashMap<String, String>();
 		headers.put("Accept",
 				"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -593,49 +480,27 @@ public class Web20Driver {
 		headers.put("Referer", hostUrl + "/activity");
 		headers.put("User-Agent",
 				"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			
+		postString = "invite=" + chateeGuid + "&__elgg_ts="
+				+ thisClient.getElggTs() + "&__elgg_token="
+				+ thisClient.getElggToken();
+		sb = thisClient.getHttp().fetchURL(hostUrl + CHAT_CREATE_URL,
+				postString, headers);
+		assert (thisClient.getHttp().getResponseCode() == 200);
+		chatGuid = sb.toString();
+		thisClient.getChatSessionList().add(chatGuid);
 
-		context.recordTime();
-		if (client1 != null && client2 != null) {
-			success = true;
-			chatPair = new ChatPair();
-			chatPair.setClient1(client1);
-			chatPair.setClient2(client2);
-			client1.setChattingPair(chatPair);
-			client2.setChattingPair(chatPair);
-			
-			//logger.fine("response headers"+client1.getHttp().dumpResponseHeaders());
-			//logger.fine("ccokies"+client1.getHttp().getCookies());
-			try {
-				postString = "invite="+client2.getGuid()+"&__elgg_ts="+client1.getElggTs()
-						+"&__elgg_token="+client1.getElggToken();
-				sb = client1.getHttp().fetchURL(hostUrl+CHAT_CREATE_URL, postString, headers);
-				assert(client1.getHttp().getResponseCode() == 200);
-				chatPair.setGuid(sb.toString());
-			} catch (Exception e) {
-				logger.fine("EXCEPTION!!!!!!!!!!\nClient1: \n user name: "+client1.getUsername()
-						+"\n password: "+client1.getPassword()
-						+"\n guid: "+client1.getGuid()
-						+"\nClient2: \n user name: "+client2.getUsername()
-						+"\n password: "+client2.getPassword()
-						+"\n guid: "+client2.getGuid());
-				throw e;
-			}
-			
-			headers.put("Referer", hostUrl + "/chat/add");
-			
-			// Send a message
-			postString = "chatsession="+chatPair.getGuid()+"&chatmessage="
-					+RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
-			sb = client1.getHttp().fetchURL(hostUrl+CHAT_POST_URL
-												+"?__elgg_token="+client1.getElggToken()
-												+"&__elgg_ts="+client1.getElggTs()
-											, postString, headers);
-			assert(client1.getHttp().getResponseCode() == 200);
-			chatPairList.add(chatPair);
+		headers.put("Referer", hostUrl + "/chat/add");
 
-		}
-		context.recordTime();
-		return success;
+		// Send a message
+		postString = "chatsession=" + chatGuid + "&chatmessage="
+				+ RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
+		sb = thisClient.getHttp().fetchURL(
+				hostUrl + CHAT_POST_URL + "?__elgg_token="
+						+ thisClient.getElggToken() + "&__elgg_ts="
+						+ thisClient.getElggTs(), postString, headers);
+		assert (thisClient.getHttp().getResponseCode() == 200);
+		
 	}
 	/**
 	 * Post something on the Wall (actually on the Wire but from the Wall!).
@@ -649,44 +514,88 @@ public class Web20Driver {
 		boolean success = false;
 
 		context.recordTime();
-		Web20Client client = selectRandomActivityPageClient();
-		if (null == client) {
-			client = selectRandomLoggedInClient();
-			if (null == client) {
-				context.recordTime();
-				return;
-			}
-			client.getHttp().fetchURL(hostUrl + ACTIVITY_URL);
-			for (String url : ACTIVITY_URLS) {
-				client.getHttp().fetchURL(hostUrl + url);
-			}
+		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			String status = "Hello world! "
+					+ new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
+							.format(new Date());
+			String postRequest = "__elgg_token=" + thisClient.getElggToken()
+					+ "&__elgg_ts=" + thisClient.getElggTs() + "&status=" + status
+					+ "&address=&access_id=2&origin=wall&container_guid="
+					+ thisClient.getGuid();
+	
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Accept",
+					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			headers.put("Accept-Language", "en-US,en;q=0.5");
+			headers.put("Accept-Encoding", "gzip, deflate");
+			headers.put("Referer", hostUrl + "/activity");
+			headers.put("User-Agent",
+					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+	
+			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + WALL_URL,
+					postRequest, headers);
+			updateElggTokenAndTs(thisClient, sb, false);
+			success = true;
 		}
-		String status = "Hello world! "
-				+ new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-						.format(new Date());
-		String postRequest = "__elgg_token=" + client.getElggToken()
-				+ "&__elgg_ts=" + client.getElggTs() + "&status=" + status
-				+ "&address=&access_id=2&origin=wall&container_guid="
-				+ client.getGuid();
-
-		Map<String, String> headers = new HashMap<String, String>();
-		headers.put("Accept",
-				"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-		headers.put("Accept-Language", "en-US,en;q=0.5");
-		headers.put("Accept-Encoding", "gzip, deflate");
-		headers.put("Referer", hostUrl + "/activity");
-		headers.put("User-Agent",
-				"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
-
-		StringBuilder sb = client.getHttp().fetchURL(hostUrl + WALL_URL,
-				postRequest, headers);
-		updateElggTokenAndTs(client, sb, false);
-		success = true;
 		context.recordTime();
 
 		if (context.isTxSteadyState()) {
-			if (success)
+			if (success) {
 				elggMetrics.attemptPostWallCnt++;
+			} else {
+				if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+					doLogin();
+				} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+					accessHomePage();
+					doLogin();
+				}
+			}
+		}
+
+	}
+
+	/**
+	 * Post something on the Wall (actually on the Wire but from the Wall!).
+	 * 
+	 * @throws Exception
+	 */
+	@BenchmarkOperation(name = "Logout", 
+						max90th = 10.0,
+						timing = Timing.MANUAL)
+	public void logout() throws Exception {
+		boolean success = false;
+
+		context.recordTime();
+		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Accept",
+					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			headers.put("Accept-Language", "en-US,en;q=0.5");
+			headers.put("Accept-Encoding", "gzip, deflate");
+			headers.put("Referer", hostUrl + "/activity");
+			headers.put("User-Agent",
+					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+	
+			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + LOGOUT_URL, headers);
+			
+			updateElggTokenAndTs(thisClient, sb, false);
+			thisClient.setClientState(ClientState.AT_HOME_PAGE);
+			success = true;
+		}
+		context.recordTime();
+
+		if (context.isTxSteadyState()) {
+			if (success) {
+				elggMetrics.attemptPostWallCnt++;
+			} else {
+				if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+					doLogin();
+				} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+					accessHomePage();
+					doLogin();
+				}
+			}
 		}
 
 	}
@@ -819,6 +728,7 @@ public class Web20Driver {
 			el[5].result = "" + this.attemptSendChatMessageCnt;
 			el[6] = new Element();
 			el[6].description = "Number of times receive message was actually attempted.";
+			el[6].passed = true;
 			el[6].result = "" + this.attemptRecvChatMessageCnt;
 			return el;
 		}

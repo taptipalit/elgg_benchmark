@@ -15,18 +15,18 @@
 			<fh:tools>NONE</fh:tools>
 			<fh:userCommands />
 		</fa:hostConfig>
-		<fa:scale>20</fa:scale>
+		<fa:scale>100</fa:scale>
 		<fa:runControl unit="time">
-			<fa:rampUp>10</fa:rampUp>
-			<fa:steadyState>180</fa:steadyState>
-			<fa:rampDown>10</fa:rampDown>
+			<fa:rampUp>60</fa:rampUp>
+			<fa:steadyState>300</fa:steadyState>
+			<fa:rampDown>60</fa:rampDown>
 		</fa:runControl>
 		<outputDir>/home/tpalit/Documents/elgg_output</outputDir>
 		<audit>false</audit>
 		<threadstart>
-			<delay>1000</delay>
+			<delay>10000</delay>
 			<simultaneous>false</simultaneous>
-			<parallel>false</parallel>
+			<parallel>true</parallel>
 		</threadstart>
 		<stats>
 			<maxruntime>6</maxruntime>
