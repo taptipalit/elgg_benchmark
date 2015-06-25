@@ -168,7 +168,7 @@ public class Web20Driver {
 		logger.addHandler(fileTxt);
 
 		BufferedReader bw = new BufferedReader(new InputStreamReader(this
-				.getClass().getClassLoader().getResourceAsStream("users.txt")));
+				.getClass().getClassLoader().getResourceAsStream("users.xml")));
 		String line;
 		while ((line = bw.readLine()) != null) {
 			String tokens[] = line.split(" ");
