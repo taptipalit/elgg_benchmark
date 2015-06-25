@@ -96,6 +96,7 @@ public class Web20Driver {
 
 	private String hostUrl;
 
+
 	/*
 	 * We can think of the users waiting at any of the pages as a "state" the
 	 * user is in. An operation can be performed only by the users which are in
@@ -255,8 +256,6 @@ public class Web20Driver {
 			Random random = new Random();
 			int randomIndex = random.nextInt(homeClientList.size());
 			Web20Client client = homeClientList.get(randomIndex);
-			logger.fine("Thread Id : " + context.getThreadId()
-					+ " removing from home page : " + client.getUsername());
 			homeClientList.remove(client);
 			return client;
 		} else {
@@ -351,7 +350,7 @@ public class Web20Driver {
 		context.recordTime();
 		Web20Client client = selectRandomActivityPageClient();
 		if (null != client) {
-			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=2"; // #TODO
+			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=2"; // Note: the %5B %5D are [ and ] respectively
 			StringBuilder sb = client.getHttp().fetchURL(hostUrl + RIVER_UPDATE_URL, postString);
 			success = true;
 		}
@@ -415,6 +414,7 @@ public class Web20Driver {
 						timing = Timing.MANUAL)
 	public void doLogin() throws Exception {
 		boolean success = false;
+		
 		context.recordTime();
 		Web20Client client = selectRandomHomePageClient();
 		if (null != client) {
@@ -442,9 +442,7 @@ public class Web20Driver {
 			StringBuilder sb = client.getHttp().fetchURL(hostUrl + LOGIN_URL,
 					postRequest, headers);
 			// System.out.println(sb.toString());
-			logger.finer(sb.toString());
 			updateElggTokenAndTs(client, sb, true);
-			logger.finer("" + client.getHttp().getResponseCode());
 			loggedInClientList.add(client);
 			activityClientList.add(client);
 			success = true;
@@ -512,9 +510,16 @@ public class Web20Driver {
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 			
-			client1.getHttp().fetchURL(hostUrl+"?__elgg_ts="+client1.getElggTs()+"__elgg_token="+client1.getElggToken(), headers);
+			client1.getHttp().fetchURL(hostUrl+CHAT_RECV_URL+"?__elgg_ts="+client1.getElggTs()+"__elgg_token="+client1.getElggToken(), headers);
+			success = true;
 		}
 		context.recordTime();
+		
+		if (success) {
+			if (context.isTxSteadyState()) {
+				elggMetrics.attemptRecvChatMessageCnt ++;
+			}
+		}
 	}
 	/**
 	 * Send a chat message
@@ -605,7 +610,6 @@ public class Web20Driver {
 						+"&__elgg_token="+client1.getElggToken();
 				sb = client1.getHttp().fetchURL(hostUrl+CHAT_CREATE_URL, postString, headers);
 				assert(client1.getHttp().getResponseCode() == 200);
-				logger.fine("ElggChat session created. Guid = "+sb.toString());
 				chatPair.setGuid(sb.toString());
 			} catch (Exception e) {
 				logger.fine("EXCEPTION!!!!!!!!!!\nClient1: \n user name: "+client1.getUsername()
