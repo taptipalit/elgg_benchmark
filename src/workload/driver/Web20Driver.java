@@ -14,6 +14,8 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.xpath.XPathExpressionException;
 
@@ -56,6 +58,13 @@ import com.sun.faban.driver.Timing;
 						"Register", /* 5 */ 
 						"Logout" /* 5 */ },
 		deviation = 5)
+
+//@FlatMix(mix = { 50, 45, 5 }, 
+//operations = { "AccessHomepage", /* 5 */
+//				"DoLogin",  /* 5 */
+//				"Logout" /* 5 */ },
+//deviation = 5)
+
 
 
 @Background(operations = 
@@ -199,32 +208,53 @@ public class Web20Driver {
 	}
 
 
-
+	Pattern pattern1 = Pattern.compile("input type=\"hidden\" name=\"__elgg_token\" value=\"(.*?)\"");
+	Pattern pattern2 = Pattern.compile("input type=\"hidden\" name=\"__elgg_ts\" value=\"(.*?)\"");
 	
 	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb, boolean updateGUID) {
 
-		// Get the Json
-		int startIndex = sb.indexOf("var elgg = ");
-		int endIndex = sb.indexOf(";", startIndex);
-		String elggJson = sb.substring(startIndex + "var elgg = ".length(),
-				endIndex);
-
-		JSONObject elgg = new JSONObject(elggJson);
-		JSONObject securityToken = elgg.getJSONObject("security")
-				.getJSONObject("token");
-		String elggToken = securityToken.getString("__elgg_token");
-		Long elggTs = securityToken.getLong("__elgg_ts");
-
-		client.setElggToken(elggToken);
-		client.setElggTs(elggTs.toString());
-
+		/* In the page, there is - 
+		
+		<input type="hidden" name="__elgg_token" value="cbeca8b16cdc8e7babb4fb0da5dfd42b" />
+		<input type="hidden" name="__elgg_ts" value="1435455938" />
+		*/
+		String elggToken = null;
+		String elggTs = null;
+		
+	    Matcher matcherToken = pattern1.matcher(sb.toString());
+	    while (matcherToken.find()) {
+	    	elggToken = matcherToken.group(1);
+	    }
+	    
+		Matcher matcherTs = pattern2.matcher(sb.toString());
+		while (matcherTs.find()) {
+			elggTs = matcherTs.group(1);
+		}
+		
 		if (updateGUID) {
+			// Get the Json
+			int startIndex = sb.indexOf("var elgg = ");
+			int endIndex = sb.indexOf(";", startIndex);
+			String elggJson = sb.substring(startIndex + "var elgg = ".length(),
+					endIndex);
+	
+			JSONObject elgg = new JSONObject(elggJson);
 			if (!elgg.getJSONObject("session").isNull("user")) {
 				JSONObject userSession = elgg.getJSONObject("session")
 						.getJSONObject("user");
 				Integer elggGuid = userSession.getInt("guid");
 					client.setGuid(elggGuid.toString());
 			}
+		}
+		
+		logger.fine("Elgg Token = "+elggToken+" Elgg Ts = "+elggTs);
+		
+		if (null != elggToken) {
+			client.setElggToken(elggToken);
+		}
+		
+		if (null != elggTs) {
+			client.setElggTs(elggTs);
 		}
 	}
 
@@ -239,6 +269,7 @@ public class Web20Driver {
 	 */
 	public void accessHomePage() throws Exception {
 		boolean success = false;
+		logger.fine("Doing operation: accessHomePage");
 		context.recordTime();
 
 		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
@@ -258,6 +289,7 @@ public class Web20Driver {
 			StringBuilder sb = http.fetchURL(hostUrl + ROOT_URL);
 	
 			updateElggTokenAndTs(thisClient, sb, false);
+			printErrorMessageIfAny(sb, null);
 			for (String url : ROOT_URLS) {
 				http.readURL(hostUrl + url);
 			}
@@ -277,9 +309,10 @@ public class Web20Driver {
 						timing = Timing.MANUAL)
 	public void doLogin() throws Exception {
 		boolean success = false;
-		
+
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+			logger.fine("Doing operation: doLogin with"+thisClient.getUsername());
 
 			/*
 			 * To do the login, To login, we need four parameters in the POST
@@ -302,11 +335,13 @@ public class Web20Driver {
 			headers.put("Referer", hostUrl + "/");
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			headers.put("Content-Type", "application/x-www-form-urlencoded");
 
 			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + LOGIN_URL,
 					postRequest, headers);
 
 			updateElggTokenAndTs(thisClient, sb, true);
+			printErrorMessageIfAny(sb, postRequest);
 			thisClient.setClientState(ClientState.LOGGED_IN);
 			success = true;
 		}
@@ -320,12 +355,32 @@ public class Web20Driver {
 	@BenchmarkOperation(name = "UpdateActivity", max90th = 10.0, timing = Timing.MANUAL)
 	public void updateActivity() throws Exception {
 		boolean success = false;
+
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=2";
-			 // Note: the %5B %5D are [ and ] respectively
+			logger.fine("Doing operation: updateActivity");
+			
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Accept",
+					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			headers.put("Accept-Language", "en-US,en;q=0.5");
+			headers.put("Accept-Encoding", "gzip, deflate");
+			headers.put("Referer", hostUrl + "/activity");
+			headers.put("User-Agent",
+					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			headers.put("Content-Type", "application/x-www-form-urlencoded");
+
+
+			String postString = "options%5Bcount%5D=false&options%5Bpagination%5D=false&options%5Boffset%5D=0&options%5Blimit%5D=20&count=0"; 
+			// Note: the %5B %5D are [ and ] respectively.
+			// #TODO: Fix the count value.
 			StringBuilder sb = thisClient.getHttp().fetchURL(
-					hostUrl + RIVER_UPDATE_URL, postString);
+					hostUrl + RIVER_UPDATE_URL, postString, headers);
+			if (sb.toString().contains("Sorry, you cannot perform this action while logged out.")) {
+				logger.fine("startNewChat: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!User logged out!!");
+			}
+			printErrorMessageIfAny(sb, postString);
+
 			success = true;
 		}
 		context.recordTime();
@@ -346,14 +401,33 @@ public class Web20Driver {
 						timing = Timing.MANUAL)
 	public void addFriend() throws Exception {
 		boolean success = false;
+		StringBuilder sb = null;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			logger.fine("Doing operation: addFriend");
+
 			String friendeeGuid = getRandomUserGUID();
-			String postString = "friend=" + friendeeGuid + "&__elgg_ts"
-					+ thisClient.getElggTs() + "&__elgg_token"
+			String postString = "friend=" + friendeeGuid + "&__elgg_ts="
+					+ thisClient.getElggTs() + "&__elgg_token="
 					+ thisClient.getElggToken();
-			thisClient.getHttp().fetchURL(
-					hostUrl + DO_ADD_FRIEND + "?" + postString, postString);
+			
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Accept",
+					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			headers.put("Accept-Language", "en-US,en;q=0.5");
+			headers.put("Accept-Encoding", "gzip, deflate");
+			headers.put("Referer", hostUrl + "/activity");
+			headers.put("User-Agent",
+					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			headers.put("Content-Type", "application/x-www-form-urlencoded");
+
+
+			sb = thisClient.getHttp().fetchURL(
+					hostUrl + DO_ADD_FRIEND + "?" + postString, postString, headers);
+			if (sb.toString().contains("Sorry, you cannot perform this action while logged out.")) {
+				logger.fine("startNewChat:!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!User logged out!!");
+			}
+			printErrorMessageIfAny(sb, postString);
 			success = true;
 		}
 		context.recordTime();
@@ -380,8 +454,11 @@ public class Web20Driver {
 			timing = Timing.MANUAL)
 	public void receiveChatMessage() throws Exception {
 		boolean success = false;
+		StringBuilder sb = null;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			logger.fine("Doing operation: receiveChatMessage");
+
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
 					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -390,8 +467,13 @@ public class Web20Driver {
 			headers.put("Referer", hostUrl + "/activity");
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+
 			
-			thisClient.getHttp().fetchURL(hostUrl+CHAT_RECV_URL+"?__elgg_ts="+thisClient.getElggTs()+"__elgg_token="+thisClient.getElggToken(), headers);
+			sb = thisClient.getHttp().fetchURL(hostUrl+CHAT_RECV_URL+"?__elgg_ts="+thisClient.getElggTs()+"&__elgg_token="+thisClient.getElggToken(), headers);
+			if (sb.toString().contains("Sorry, you cannot perform this action while logged out.")) {
+				logger.fine("receiveNewChat: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!User logged out!!");
+			}
+			printErrorMessageIfAny(sb, null);
 			success = true;
 		}
 		context.recordTime();
@@ -402,6 +484,7 @@ public class Web20Driver {
 			}
 		} 
 	}
+	
 	/**
 	 * Send a chat message
 	 * 
@@ -415,10 +498,13 @@ public class Web20Driver {
 		StringBuilder sb = null;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			logger.fine("Doing operation: sendChatMessage");
+
 			if (random.nextBoolean() || thisClient.getChatSessionList().isEmpty()) {
 				startNewChat();
 			} else {
 				// Continue an existing chat conversation
+				logger.fine("Doing suboperation: continue existing conversation");
 				String chatGuid = thisClient.getChatSessionList().get(random.nextInt(thisClient.getChatSessionList().size()));
 				
 					Map<String, String> headers = new HashMap<String, String>();
@@ -429,6 +515,8 @@ public class Web20Driver {
 					headers.put("Referer", hostUrl + "/activity");
 					headers.put("User-Agent",
 							"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+					headers.put("Content-Type", "application/x-www-form-urlencoded");
+
 	
 					String postString = "chatsession="+chatGuid+"&chatmessage="
 							+RandomStringGenerator.generateRandomString(15, Mode.ALPHA);
@@ -436,7 +524,11 @@ public class Web20Driver {
 														+"?__elgg_token="+thisClient.getElggToken()
 														+"&__elgg_ts="+thisClient.getElggTs()
 													, postString, headers);
-					
+					if (sb.toString().contains("Sorry, you cannot perform this action while logged out.")) {
+						logger.fine("continueChat: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!User logged out!!");
+					}
+					printErrorMessageIfAny(sb, postString);
+
 			}
 			success = true;
 		}
@@ -460,6 +552,7 @@ public class Web20Driver {
 		String postString = null;
 		String chatGuid = null;
 		
+		logger.fine("Doing suboperation: start new conversation");
 		// Create a new chat communication between two logged in users
 		String chateeGuid = getRandomUserGUID();
 		
@@ -471,6 +564,8 @@ public class Web20Driver {
 		headers.put("Referer", hostUrl + "/activity");
 		headers.put("User-Agent",
 				"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+		headers.put("Content-Type", "application/x-www-form-urlencoded");
+
 			
 		postString = "invite=" + chateeGuid + "&__elgg_ts="
 				+ thisClient.getElggTs() + "&__elgg_token="
@@ -478,7 +573,13 @@ public class Web20Driver {
 		sb = thisClient.getHttp().fetchURL(hostUrl + CHAT_CREATE_URL,
 				postString, headers);
 		assert (thisClient.getHttp().getResponseCode() == 200);
+		
+		if (sb.toString().contains("Sorry, you cannot perform this action while logged out.")) {
+			logger.fine("startNewChat: create session: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!User logged out!!");
+		}
+
 		chatGuid = sb.toString();
+
 		thisClient.getChatSessionList().add(chatGuid);
 
 		headers.put("Referer", hostUrl + "/activity");
@@ -490,10 +591,14 @@ public class Web20Driver {
 				hostUrl + CHAT_POST_URL + "?__elgg_token="
 						+ thisClient.getElggToken() + "&__elgg_ts="
 						+ thisClient.getElggTs(), postString, headers);
-		System.out.println(sb);
+		if (sb.toString().contains("Sorry, you cannot perform this action while logged out.")) {
+			logger.fine("startNewChat: send Message: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!User logged out!!");
+		}
+		printErrorMessageIfAny(sb, postString);
 		assert (thisClient.getHttp().getResponseCode() == 200);
 		
 	}
+	
 	/**
 	 * Post something on the Wall (actually on the Wire but from the Wall!).
 	 * 
@@ -507,6 +612,8 @@ public class Web20Driver {
 
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			logger.fine("Doing operation: post wall");
+
 			String status = "Hello world! "
 					+ new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
 							.format(new Date());
@@ -514,7 +621,6 @@ public class Web20Driver {
 					+ "&__elgg_ts=" + thisClient.getElggTs() + "&status=" + status
 					+ "&address=&access_id=2&origin=wall&container_guid="
 					+ thisClient.getGuid();
-	
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
 					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -523,9 +629,12 @@ public class Web20Driver {
 			headers.put("Referer", hostUrl + "/activity");
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			headers.put("Content-Type", "application/x-www-form-urlencoded");
+
 	
 			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + WALL_URL,
 					postRequest, headers);
+			printErrorMessageIfAny(sb, postRequest);
 			updateElggTokenAndTs(thisClient, sb, false);
 			success = true;
 		}
@@ -559,6 +668,7 @@ public class Web20Driver {
 
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
+			logger.fine("Doing operation: logout");
 
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
@@ -568,12 +678,15 @@ public class Web20Driver {
 			headers.put("Referer", hostUrl + "/activity");
 			headers.put("User-Agent",
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+
 	
-			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + LOGOUT_URL, headers);
-			
+			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + LOGOUT_URL
+					+"?__elgg_ts="+thisClient.getElggTs()+"&__elgg_token="+thisClient.getElggToken(), headers);
+			printErrorMessageIfAny(sb, null);
 			updateElggTokenAndTs(thisClient, sb, false);
 			thisClient.setClientState(ClientState.AT_HOME_PAGE);
 			success = true;
+
 		}
 		context.recordTime();
 
@@ -603,70 +716,84 @@ public class Web20Driver {
 	public void register() throws Exception {
 		boolean success = false;
 
-		Web20Client client = new Web20Client();
-
-		HttpTransport http = HttpTransport.newInstance();
-		http.addTextType("application/xhtml+xml");
-		http.addTextType("application/xml");
-		http.addTextType("q=0.9,*/*");
-		http.addTextType("q=0.8");
-		http.setFollowRedirects(true);
-		client.setHttp(http);
-
-		// Navigate to the home page
-
-		StringBuilder sb = http.fetchURL(hostUrl + ROOT_URL);
-
-		updateElggTokenAndTs(client, sb, false);
-		for (String url : ROOT_URLS) {
-			http.readURL(hostUrl + url);
-			// System.out.println(sb.indexOf("__elgg_token"));
-		}
 
 		context.recordTime();
 
-		// Click on Register link and generate user name and password
+		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+			logger.fine("Doing operation: register");
 
-		client.getHttp().fetchURL(hostUrl + REGISTER_PAGE_URL);
-		String userName = RandomStringGenerator.generateRandomString(10,
-				RandomStringGenerator.Mode.ALPHA);
-		String password = RandomStringGenerator.generateRandomString(10,
-				RandomStringGenerator.Mode.ALPHA);
-		String email = RandomStringGenerator.generateRandomString(7,
-				RandomStringGenerator.Mode.ALPHA)
-				+ "@"
-				+ RandomStringGenerator.generateRandomString(5,
-						RandomStringGenerator.Mode.ALPHA) + ".co.in";
-		client.setUsername(userName);
-		client.setPassword(password);
-		client.setEmail(email);
-
-		String postString = "__elgg_token=" + client.getElggToken()
-				+ "&__elgg_ts=" + client.getElggTs() + "&name="
-				+ client.getUsername() + "&email=" + client.getEmail()
-				+ "&username=" + client.getUsername() + "&password="
-				+ client.getPassword() + "&password2=" + client.getPassword()
-				+ "&friend_guid=0+&invitecode=&submit=Register";
-		// __elgg_token=0c3a778d2b74a7e7faf63a6ba55d4832&__elgg_ts=1434992983&name=display_name&email=tapti.palit%40gmail.com&username=user_name&password=pass_word&password2=pass_word&friend_guid=0&invitecode=&submit=Register
-
-		Map<String, String> headers = new HashMap<String, String>();
-		headers.put("Accept",
-				"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-		headers.put("Accept-Language", "en-US,en;q=0.5");
-		headers.put("Accept-Encoding", "gzip, deflate");
-		headers.put("Referer", hostUrl + "/register");
-		headers.put("User-Agent",
-				"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
-
-		sb = client.getHttp().fetchURL(hostUrl + DO_REGISTER_URL, postString,
-				headers);
-		// System.out.println(sb);
+			// Navigate to the home page
+	
+			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + ROOT_URL);
+	
+			updateElggTokenAndTs(thisClient, sb, false);
+			for (String url : ROOT_URLS) {
+				thisClient.getHttp().readURL(hostUrl + url);
+				// System.out.println(sb.indexOf("__elgg_token"));
+			}
+	
+	
+			// Click on Register link and generate user name and password
+	
+			thisClient.getHttp().fetchURL(hostUrl + REGISTER_PAGE_URL);
+			String userName = RandomStringGenerator.generateRandomString(10,
+					RandomStringGenerator.Mode.ALPHA);
+			String password = RandomStringGenerator.generateRandomString(10,
+					RandomStringGenerator.Mode.ALPHA);
+			String email = RandomStringGenerator.generateRandomString(7,
+					RandomStringGenerator.Mode.ALPHA)
+					+ "@"
+					+ RandomStringGenerator.generateRandomString(5,
+							RandomStringGenerator.Mode.ALPHA) + ".co.in";
+			thisClient.setUsername(userName);
+			thisClient.setPassword(password);
+			thisClient.setEmail(email);
+	
+			String postString = "__elgg_token=" + thisClient.getElggToken()
+					+ "&__elgg_ts=" + thisClient.getElggTs() + "&name="
+					+ thisClient.getUsername() + "&email=" + thisClient.getEmail()
+					+ "&username=" + thisClient.getUsername() + "&password="
+					+ thisClient.getPassword() + "&password2=" + thisClient.getPassword()
+					+ "&friend_guid=0+&invitecode=&submit=Register";
+			// __elgg_token=0c3a778d2b74a7e7faf63a6ba55d4832&__elgg_ts=1434992983&name=display_name&email=tapti.palit%40gmail.com&username=user_name&password=pass_word&password2=pass_word&friend_guid=0&invitecode=&submit=Register
+	
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Accept",
+					"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			headers.put("Accept-Language", "en-US,en;q=0.5");
+			headers.put("Accept-Encoding", "gzip, deflate");
+			headers.put("Referer", hostUrl + "/register");
+			headers.put("User-Agent",
+					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			headers.put("Content-Type", "application/x-www-form-urlencoded");
+	
+			sb = thisClient.getHttp().fetchURL(hostUrl + DO_REGISTER_URL, postString,
+					headers);
+			printErrorMessageIfAny(sb, postString);
+			// System.out.println(sb);
+		}
 		context.recordTime();
 		if (context.isTxSteadyState()) {
 			if (success)
 				elggMetrics.attemptUpdateActivityCnt++;
 		}
 
+	}
+	
+	private void printErrorMessageIfAny(StringBuilder sb, String postRequest) {
+		String htmlContent = sb.toString();
+		String startTag = "<li class=\"elgg-message elgg-state-error\">";
+		String endTag = "</li>";
+		if (htmlContent.contains("elgg-system-messages")) {
+			if (htmlContent.contains(startTag)) {
+				int fromIndex = htmlContent.indexOf(startTag)+startTag.length();
+				int toIndex = htmlContent.indexOf(endTag, fromIndex);
+				String error = htmlContent.substring(fromIndex, toIndex);
+				if (!error.trim().isEmpty()) {
+					logger.info("Error: "+error+"Post request was: "+postRequest);
+				}
+			}
+		}
 	}
 
 	static class ElggDriverMetrics implements CustomMetrics {
@@ -740,11 +867,17 @@ public class Web20Driver {
 
 	public static void main(String[] pp) throws Exception {
 		Web20Driver driver = new Web20Driver();
-		driver.accessHomePage();
+		System.out.println("Initing ...");
 		driver.accessHomePage();
 		driver.doLogin();
-		driver.doLogin();
+
+		driver.receiveChatMessage();
 		driver.sendChatMessage();
+		driver.updateActivity();
+		driver.logout();
+		driver.register();
+		driver.doLogin();
+		driver.receiveChatMessage();
 	}
 	
 

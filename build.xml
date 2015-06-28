@@ -37,6 +37,7 @@
             <classpath refid="classpath"/>
         </javac>
     	<copy file="${src.dir}/users.txt" todir="${classes.dir}" />
+    	<copy file="${src.dir}/users.xml" todir="${classes.dir}" />
     </target>
 
     <target name="clean" description="cleanup module">
@@ -49,7 +50,7 @@
     <target name="bench.jar" depends="compile" description="Assembles library jar with benchmark classes">
         <mkdir dir="${buildlib.dir}"/>
         <jar jarfile="${buildlib.dir}/${bench.shortname}.jar">
-            <fileset dir="${classes.dir}" includes="**/*.class **/*.txt"/>
+            <fileset dir="${classes.dir}" includes="**/*.class **/*.txt **/*.xml"/>
         </jar>
     </target>
 
