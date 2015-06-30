@@ -34,8 +34,8 @@ import com.sun.faban.driver.DriverContext;
 import com.sun.faban.driver.FixedTime;
 import com.sun.faban.driver.FlatMix;
 import com.sun.faban.driver.HttpTransport;
-import com.sun.faban.driver.NegativeExponential;
 import com.sun.faban.driver.Timing;
+import com.sun.faban.driver.Uniform;
 
 @BenchmarkDefinition(name = "Elgg benchmark", version = "0.1")
 @BenchmarkDriver(name = "ElggDriver", 
@@ -49,23 +49,23 @@ import com.sun.faban.driver.Timing;
  * The mix of operations and their proabilities.
  */
 
+/*
+@FlatMix(mix = {100},
+		operations = {"AccessHomepage"},
+		deviation = 5
+		)
+*/
+
+
 @FlatMix(mix = { 5, 5, 30, 35, 15, 5, 5 }, 
-		operations = { "AccessHomepage", /* 5 */
-						"DoLogin",  /* 5 */
-						"PostSelfWall", /* 35 */
-						"SendChatMessage", /* 35 */
-						"AddFriend", /* 10 */
-						"Register", /* 5 */ 
-						"Logout" /* 5 */ },
+		operations = { "AccessHomepage", 
+						"DoLogin",  
+						"PostSelfWall", 
+						"SendChatMessage", 
+						"AddFriend", 
+						"Register", 
+						"Logout"  },
 		deviation = 5)
-
-//@FlatMix(mix = { 50, 45, 5 }, 
-//operations = { "AccessHomepage", /* 5 */
-//				"DoLogin",  /* 5 */
-//				"Logout" /* 5 */ },
-//deviation = 5)
-
-
 
 @Background(operations = 
 	{ "UpdateActivity", "ReceiveChatMessage"}, 
@@ -74,12 +74,23 @@ import com.sun.faban.driver.Timing;
 		@FixedTime(cycleTime = 1000, cycleDeviation = 2) }
 )
 
-
+/*
 @NegativeExponential(cycleDeviation = 2, 
 						cycleMean = 4000, // 4 seconds
 						cycleType = CycleType.THINKTIME)
+*/
 
+/*
+@Uniform(cycleMax = 10000,
+		 cycleMin = 1000,
+		 cycleDeviation = 10,
+		 cycleType = CycleType.THINKTIME)
+*/
+
+@FixedTime(cycleTime = 400,
+	cycleType = CycleType.THINKTIME, cycleDeviation = 1000)
 // cycle time or think time - count from the start of prev operation or end
+
 /**
  * The main driver class.
  * 
@@ -269,7 +280,7 @@ public class Web20Driver {
 	 */
 	public void accessHomePage() throws Exception {
 		boolean success = false;
-		logger.fine("Doing operation: accessHomePage");
+		logger.fine(context.getThreadId() +" : Doing operation: accessHomePage");
 		context.recordTime();
 
 		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
@@ -297,10 +308,10 @@ public class Web20Driver {
 	
 		}
 		context.recordTime();
-		if (context.isTxSteadyState()) {
-			if (success)
-				elggMetrics.attemptHomePageCnt++;
-		}
+		System.out.println(context.isTxSteadyState());
+		System.out.println(success);
+		if (success && context.isTxSteadyState())
+			elggMetrics.attemptHomePageCnt++;		
 
 	}
 
@@ -312,7 +323,7 @@ public class Web20Driver {
 
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
-			logger.fine("Doing operation: doLogin with"+thisClient.getUsername());
+			logger.fine(context.getThreadId() +" : Doing operation: doLogin with"+thisClient.getUsername());
 
 			/*
 			 * To do the login, To login, we need four parameters in the POST
@@ -346,10 +357,8 @@ public class Web20Driver {
 			success = true;
 		}
 		context.recordTime();
-		if (context.isTxSteadyState()) {
-			if (success)
-				elggMetrics.attemptLoginCnt++;
-		}
+		if (success && context.isTxSteadyState())
+			elggMetrics.attemptLoginCnt++;
 	}
 
 	@BenchmarkOperation(name = "UpdateActivity", max90th = 10.0, timing = Timing.MANUAL)
@@ -358,7 +367,7 @@ public class Web20Driver {
 
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			logger.fine("Doing operation: updateActivity");
+			logger.fine(context.getThreadId() +" : Doing operation: updateActivity");
 			
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
@@ -384,10 +393,8 @@ public class Web20Driver {
 			success = true;
 		}
 		context.recordTime();
-		if (context.isTxSteadyState()) {
-			if (success) {
-				elggMetrics.attemptUpdateActivityCnt++;
-			}
+		if (success && context.isTxSteadyState()) {
+			elggMetrics.attemptUpdateActivityCnt++;
 		}
 	}
 
@@ -404,7 +411,7 @@ public class Web20Driver {
 		StringBuilder sb = null;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			logger.fine("Doing operation: addFriend");
+			logger.fine(context.getThreadId() +" : Doing operation: addFriend");
 
 			String friendeeGuid = getRandomUserGUID();
 			String postString = "friend=" + friendeeGuid + "&__elgg_ts="
@@ -431,18 +438,17 @@ public class Web20Driver {
 			success = true;
 		}
 		context.recordTime();
-		if (success) {
-			if (context.isTxSteadyState()) {
-				elggMetrics.attemptAddFriendsCnt++;
-			}
-		} else {
+		if (success && context.isTxSteadyState()) {
+					if (context.isTxSteadyState())
+					elggMetrics.attemptAddFriendsCnt++;
+		}/* else {
 			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
 				doLogin();
 			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
 				accessHomePage();
 				doLogin();
 			}
-		}
+		}*/
 
 	}
 
@@ -457,7 +463,7 @@ public class Web20Driver {
 		StringBuilder sb = null;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			logger.fine("Doing operation: receiveChatMessage");
+			logger.fine(context.getThreadId() +" : Doing operation: receiveChatMessage");
 
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
@@ -478,10 +484,8 @@ public class Web20Driver {
 		}
 		context.recordTime();
 		
-		if (success) {
-			if (context.isTxSteadyState()) {
+		if (success && context.isTxSteadyState()) {
 				elggMetrics.attemptRecvChatMessageCnt ++;
-			}
 		} 
 	}
 	
@@ -498,13 +502,13 @@ public class Web20Driver {
 		StringBuilder sb = null;
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			logger.fine("Doing operation: sendChatMessage");
+			logger.fine(context.getThreadId() +" : Doing operation: sendChatMessage");
 
 			if (random.nextBoolean() || thisClient.getChatSessionList().isEmpty()) {
 				startNewChat();
 			} else {
 				// Continue an existing chat conversation
-				logger.fine("Doing suboperation: continue existing conversation");
+				logger.fine(context.getThreadId() +" : Doing suboperation: continue existing conversation");
 				String chatGuid = thisClient.getChatSessionList().get(random.nextInt(thisClient.getChatSessionList().size()));
 				
 					Map<String, String> headers = new HashMap<String, String>();
@@ -533,18 +537,16 @@ public class Web20Driver {
 			success = true;
 		}
 		context.recordTime();
-		if (success) {
-			if (context.isTxSteadyState()) {
+		if (success && context.isTxSteadyState()) {
 				elggMetrics.attemptSendChatMessageCnt ++;
-			}
-		} else {
+		} /*else {
 			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
 				doLogin();
 			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
 				accessHomePage();
 				doLogin();
 			}
-		}
+		}*/
 	}
 
 	private void startNewChat() throws Exception {
@@ -552,7 +554,7 @@ public class Web20Driver {
 		String postString = null;
 		String chatGuid = null;
 		
-		logger.fine("Doing suboperation: start new conversation");
+		logger.fine(context.getThreadId() +" : Doing suboperation: start new conversation");
 		// Create a new chat communication between two logged in users
 		String chateeGuid = getRandomUserGUID();
 		
@@ -612,7 +614,7 @@ public class Web20Driver {
 
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			logger.fine("Doing operation: post wall");
+			logger.fine(context.getThreadId()+context.getThreadId() +" : Doing operation: post wall");
 
 			String status = "Hello world! "
 					+ new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
@@ -640,18 +642,16 @@ public class Web20Driver {
 		}
 		context.recordTime();
 
-		if (context.isTxSteadyState()) {
-			if (success) {
-				elggMetrics.attemptPostWallCnt++;
-			} else {
-				if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
-					doLogin();
-				} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
-					accessHomePage();
-					doLogin();
-				}
+		if (success && context.isTxSteadyState()) {
+			elggMetrics.attemptPostWallCnt++;
+		} /*else {
+			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+				doLogin();
+			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+				accessHomePage();
+				doLogin();
 			}
-		}
+		}	*/	
 
 	}
 
@@ -668,7 +668,7 @@ public class Web20Driver {
 
 		context.recordTime();
 		if (thisClient.getClientState() == ClientState.LOGGED_IN) {
-			logger.fine("Doing operation: logout");
+			logger.fine(context.getThreadId() +" : Doing operation: logout");
 
 			Map<String, String> headers = new HashMap<String, String>();
 			headers.put("Accept",
@@ -690,18 +690,16 @@ public class Web20Driver {
 		}
 		context.recordTime();
 
-		if (context.isTxSteadyState()) {
-			if (success) {
-				elggMetrics.attemptPostWallCnt++;
-			} else {
-				if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
-					doLogin();
-				} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
-					accessHomePage();
-					doLogin();
-				}
+		if (success && context.isTxSteadyState()) {
+			elggMetrics.attemptLogoutCnt++;
+		} /*else {
+			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
+				doLogin();
+			} else if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
+				accessHomePage();
+				doLogin();
 			}
-		}
+		}	*/	
 
 	}
 
@@ -716,26 +714,31 @@ public class Web20Driver {
 	public void register() throws Exception {
 		boolean success = false;
 
-
+		Web20Client tempClient = new Web20Client();
+		HttpTransport http;
+		
 		context.recordTime();
 
 		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
-			logger.fine("Doing operation: register");
+			http = HttpTransport.newInstance();
+			tempClient.setHttp(http);
+
+			logger.fine(context.getThreadId() +" : Doing operation: register");
 
 			// Navigate to the home page
 	
-			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + ROOT_URL);
+			StringBuilder sb = tempClient.getHttp().fetchURL(hostUrl + ROOT_URL);
 	
-			updateElggTokenAndTs(thisClient, sb, false);
+			updateElggTokenAndTs(tempClient, sb, false);
 			for (String url : ROOT_URLS) {
-				thisClient.getHttp().readURL(hostUrl + url);
+				tempClient.getHttp().readURL(hostUrl + url);
 				// System.out.println(sb.indexOf("__elgg_token"));
 			}
 	
 	
 			// Click on Register link and generate user name and password
 	
-			thisClient.getHttp().fetchURL(hostUrl + REGISTER_PAGE_URL);
+			tempClient.getHttp().fetchURL(hostUrl + REGISTER_PAGE_URL);
 			String userName = RandomStringGenerator.generateRandomString(10,
 					RandomStringGenerator.Mode.ALPHA);
 			String password = RandomStringGenerator.generateRandomString(10,
@@ -745,15 +748,15 @@ public class Web20Driver {
 					+ "@"
 					+ RandomStringGenerator.generateRandomString(5,
 							RandomStringGenerator.Mode.ALPHA) + ".co.in";
-			thisClient.setUsername(userName);
-			thisClient.setPassword(password);
-			thisClient.setEmail(email);
+			tempClient.setUsername(userName);
+			tempClient.setPassword(password);
+			tempClient.setEmail(email);
 	
-			String postString = "__elgg_token=" + thisClient.getElggToken()
-					+ "&__elgg_ts=" + thisClient.getElggTs() + "&name="
-					+ thisClient.getUsername() + "&email=" + thisClient.getEmail()
-					+ "&username=" + thisClient.getUsername() + "&password="
-					+ thisClient.getPassword() + "&password2=" + thisClient.getPassword()
+			String postString = "__elgg_token=" + tempClient.getElggToken()
+					+ "&__elgg_ts=" + tempClient.getElggTs() + "&name="
+					+ tempClient.getUsername() + "&email=" + tempClient.getEmail()
+					+ "&username=" + tempClient.getUsername() + "&password="
+					+ tempClient.getPassword() + "&password2=" + tempClient.getPassword()
 					+ "&friend_guid=0+&invitecode=&submit=Register";
 			// __elgg_token=0c3a778d2b74a7e7faf63a6ba55d4832&__elgg_ts=1434992983&name=display_name&email=tapti.palit%40gmail.com&username=user_name&password=pass_word&password2=pass_word&friend_guid=0&invitecode=&submit=Register
 	
@@ -767,16 +770,14 @@ public class Web20Driver {
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 			headers.put("Content-Type", "application/x-www-form-urlencoded");
 	
-			sb = thisClient.getHttp().fetchURL(hostUrl + DO_REGISTER_URL, postString,
+			sb = tempClient.getHttp().fetchURL(hostUrl + DO_REGISTER_URL, postString,
 					headers);
 			printErrorMessageIfAny(sb, postString);
 			// System.out.println(sb);
 		}
 		context.recordTime();
-		if (context.isTxSteadyState()) {
-			if (success)
-				elggMetrics.attemptUpdateActivityCnt++;
-		}
+		if (success && context.isTxSteadyState())
+			elggMetrics.attemptRegisterCnt++;		
 
 	}
 	
@@ -797,7 +798,7 @@ public class Web20Driver {
 	}
 
 	static class ElggDriverMetrics implements CustomMetrics {
-
+		
 		int attemptLoginCnt = 0;
 		int attemptHomePageCnt = 0;
 		int attemptPostWallCnt = 0;
@@ -805,7 +806,9 @@ public class Web20Driver {
 		int attemptAddFriendsCnt = 0;
 		int attemptSendChatMessageCnt = 0;
 		int attemptRecvChatMessageCnt = 0;
-		
+		int attemptLogoutCnt = 0;
+		int attemptRegisterCnt = 0;
+
 		@Override
 		public void add(CustomMetrics arg0) {
 			ElggDriverMetrics e = (ElggDriverMetrics) arg0;
@@ -816,11 +819,13 @@ public class Web20Driver {
 			this.attemptAddFriendsCnt += e.attemptAddFriendsCnt;
 			this.attemptSendChatMessageCnt += e.attemptSendChatMessageCnt;
 			this.attemptRecvChatMessageCnt += e.attemptRecvChatMessageCnt;
+			this.attemptLogoutCnt += e.attemptLogoutCnt;
+			this.attemptRegisterCnt += e.attemptRegisterCnt;
 		}
 
 		@Override
 		public Element[] getResults() {
-			Element[] el = new Element[7];
+			Element[] el = new Element[9];
 			el[0] = new Element();
 			el[0].description = "Number of times home page was actually attempted to be accessed.";
 			el[0].passed = true;
@@ -849,6 +854,14 @@ public class Web20Driver {
 			el[6].description = "Number of times receive message was actually attempted.";
 			el[6].passed = true;
 			el[6].result = "" + this.attemptRecvChatMessageCnt;
+			el[7] = new Element();
+			el[7].description = "Number of times logout was actually attempted.";
+			el[7].passed = true;
+			el[7].result = "" + this.attemptLogoutCnt;
+			el[8] = new Element();
+			el[8].description = "Number of times register was actually attempted.";
+			el[8].passed = true;
+			el[8].result = "" + this.attemptRegisterCnt;
 			return el;
 		}
 
@@ -861,6 +874,8 @@ public class Web20Driver {
 			clone.attemptAddFriendsCnt = this.attemptAddFriendsCnt;
 			clone.attemptSendChatMessageCnt = this.attemptSendChatMessageCnt;
 			clone.attemptRecvChatMessageCnt = this.attemptRecvChatMessageCnt;
+			clone.attemptLogoutCnt = this.attemptLogoutCnt;
+			clone.attemptRegisterCnt = this.attemptRegisterCnt;
 			return clone;
 		}
 	}
