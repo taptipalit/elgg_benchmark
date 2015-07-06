@@ -85,6 +85,8 @@ public class UserGenerator {
 	}
 	
 	private void createUsers() throws Exception {
+		int i = 0;
+		
 		HttpTransport http = HttpTransport.newInstance();
 		http.setFollowRedirects(true);
 		http.addTextType("application/xhtml+xml");
@@ -118,7 +120,7 @@ public class UserGenerator {
 			
 		updateElggTokenAndTs(tokenTsPair, sb);
 
-		
+		i = 0;
 		for (UserEntity user: userList) {
 			headers.put("Referer", hostURL+"/admin");
 			sb = http.fetchURL(hostURL+"/admin/users/add", headers);
@@ -133,6 +135,7 @@ public class UserGenerator {
 			int endIndex = sb.indexOf("#", startIndex);
 			String guid = sb.substring(startIndex, endIndex);
 			user.setGuid(guid);
+			System.out.println("User"+i+++" generated.");
 		}
 	}
 	

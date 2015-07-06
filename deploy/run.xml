@@ -15,7 +15,7 @@
 			<fh:tools>NONE</fh:tools>
 			<fh:userCommands />
 		</fa:hostConfig>
-		<fa:scale>25</fa:scale>
+		<fa:scale>150</fa:scale>
 		<fa:runControl unit="time">
 			<fa:rampUp>30</fa:rampUp>
 			<fa:steadyState>300</fa:steadyState>
