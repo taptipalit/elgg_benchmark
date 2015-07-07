@@ -50,8 +50,9 @@ import com.sun.faban.driver.Timing;
  * The mix of operations and their proabilities.
  */
 
-
-@MatrixMix (operations = {"AccessHomepage", 
+@MatrixMix (operations = {
+		"BrowsetoElgg",
+		"AccessHomepage", 
 		"DoLogin",  
 		"PostSelfWall", 
 		"SendChatMessage", 
@@ -59,16 +60,16 @@ import com.sun.faban.driver.Timing;
 		"Register", 
 		"Logout"  },
 		mix = { 
-		@Row ({5, 5, 30, 35, 15, 0, 5}),
-		@Row ({5, 0, 30, 35, 15, 0, 5}),
-		@Row ({5, 0, 30, 35, 15, 0, 5}),
-		@Row ({5, 0, 30, 35, 15, 0, 5}),
-		@Row ({5, 0, 30, 35, 15, 0, 5}),
-		@Row ({0, 100, 0, 0, 0, 0, 0}),
-		@Row ({0, 50, 0, 0, 0, 50, 0})
+		@Row ({0, 0, 100,0, 0,  0,  0, 0}),
+		@Row ({0, 5, 5, 30, 35, 19, 0, 1}),
+		@Row ({0, 5, 0, 30, 35, 19, 0, 1}),
+		@Row ({0, 5, 0, 30, 35, 19, 0, 1}),
+		@Row ({0, 5, 0, 30, 35, 19, 0, 1}),
+		@Row ({0, 5, 0, 30, 35, 19, 0, 1}),
+		@Row ({0, 100, 0, 0, 0, 0, 0, 0}),
+		@Row ({0, 90, 0, 0, 0, 0, 10, 0})
 		}
 		)
-
 /*
 @MatrixMix (operations = {"AccessHomepage", 
 		"DoLogin",  
@@ -79,14 +80,14 @@ import com.sun.faban.driver.Timing;
 		@Row ({100, 0, 0})
 		}
 		)
-		*/
-/*@Background(operations = 
+*/
+@Background(operations = 
 	{ "UpdateActivity", "ReceiveChatMessage"}, 
 	timings = { 
 		@FixedTime(cycleTime = 5000, cycleDeviation = 2),
 		@FixedTime(cycleTime = 8000, cycleDeviation = 2) }
 		
-)*/
+)
 
 
 /*
@@ -102,7 +103,7 @@ import com.sun.faban.driver.Timing;
 		 cycleType = CycleType.THINKTIME)
 */
 
-@FixedTime(cycleTime = 5000,
+@FixedTime(cycleTime = 15000,
 	cycleType = CycleType.THINKTIME, cycleDeviation = 1000)
 // cycle time or think time - count from the start of prev operation or end
 
@@ -161,9 +162,9 @@ public class Web20Driver {
 			"/_graphics/sidebar_background.gif",
 			"/_graphics/button_graduation.png", "/_graphics/favicon-128.png" };
 	private final String LOGIN_URL = "/action/login";
-	private final String[] LOGIN_URLS = new String[] { "/js/lib/ui.river.js",
+	private final String[] LOGIN_URLS = new String[] { //"/js/lib/ui.river.js",
 			"/_graphics/icons/user/defaulttopbar.gif",
-			"/mod/riverautoupdate/_graphics/loading.gif",
+//			"/mod/riverautoupdate/_graphics/loading.gif",
 			"/_graphics/toptoolbar_background.gif",
 			"/mod/reportedcontent/graphics/icon_reportthis.gif" };
 	private final String ACTIVITY_URL = "/activity";
@@ -233,9 +234,9 @@ public class Web20Driver {
 		thisUserPasswordPair = userPasswordList.get(context.getThreadId());
 
 		elggMetrics = new ElggDriverMetrics();
-		//context.attachMetrics(elggMetrics);
+		context.attachMetrics(elggMetrics);
 		
-		//hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
+		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
 		hostUrl = "http://octeon";
 		random = new Random();
 	}
@@ -306,7 +307,7 @@ public class Web20Driver {
 	}
 
 
-	@BenchmarkOperation(name = "AccessHomepage", 
+	@BenchmarkOperation(name = "BrowsetoElgg", 
 						max90th = 6.0, 
 						timing = Timing.MANUAL)
 	/**
@@ -314,9 +315,9 @@ public class Web20Driver {
 	 * The details of the new client are stored in the 
 	 * @throws Exception
 	 */
-	public void accessHomePage() throws Exception {
+	public void browseToElgg() throws Exception {
 		boolean success = false;
-		logger.fine(context.getThreadId() +" : Doing operation: accessHomePage");
+		logger.fine(context.getThreadId() +" : Doing operation: browsetoelgg");
 		context.recordTime();
 
 		if (thisClient.getClientState() == ClientState.LOGGED_OUT) {
@@ -324,7 +325,12 @@ public class Web20Driver {
 			thisClient.setGuid(thisUserPasswordPair.getGuid());
 			thisClient.setUsername(thisUserPasswordPair.getUserName());
 			thisClient.setPassword(thisUserPasswordPair.getPassword());
-	
+			/*
+			thisClient.setGuid("43");
+			thisClient.setUsername("tpalit");
+			thisClient.setPassword("password1234");
+			*/
+			
 			HttpTransport http = HttpTransport.newInstance();
 			http.addTextType("application/xhtml+xml");
 			http.addTextType("application/xml");
@@ -344,7 +350,51 @@ public class Web20Driver {
 
 		}
 		context.recordTime();
-		if (success && context.isTxSteadyState())
+		if (success)
+			elggMetrics.attemptHomePageCnt++;		
+
+	}
+
+@BenchmarkOperation(name = "AccessHomepage", 
+						max90th = 6.0, 
+						timing = Timing.MANUAL)
+	/**
+	 * A logged in client accesses the home page
+	 * @throws Exception
+	 */
+	public void accessHomePage() throws Exception {
+		boolean success = false;
+		logger.fine(context.getThreadId()
+				+ " : Doing operation: accessHomePage");
+		context.recordTime();
+
+		thisClient.setGuid(thisUserPasswordPair.getGuid());
+		thisClient.setUsername(thisUserPasswordPair.getUserName());
+		thisClient.setPassword(thisUserPasswordPair.getPassword());
+		/*
+		 * thisClient.setGuid("43"); thisClient.setUsername("tpalit");
+		 * thisClient.setPassword("password1234");
+		 */
+
+		HttpTransport http = HttpTransport.newInstance();
+		http.addTextType("application/xhtml+xml");
+		http.addTextType("application/xml");
+		http.addTextType("q=0.9,*/*");
+		http.addTextType("q=0.8");
+		http.setFollowRedirects(true);
+
+		thisClient.setHttp(http);
+		thisClient.setClientState(ClientState.AT_HOME_PAGE);
+		StringBuilder sb = http.fetchURL(hostUrl + ROOT_URL);
+
+		updateElggTokenAndTs(thisClient, sb, false);
+		printErrorMessageIfAny(sb, null);
+		for (String url : ROOT_URLS) {
+			http.readURL(hostUrl + url);
+		}
+
+		context.recordTime();
+		if (success)
 			elggMetrics.attemptHomePageCnt++;		
 
 	}
@@ -382,28 +432,10 @@ public class Web20Driver {
 					"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:33.0) Gecko/20100101 Firefox/33.0");
 			headers.put("Content-Type", "application/x-www-form-urlencoded");
 
-			loginStart = System.currentTimeMillis();
-			thisClient.getHttp().setFollowRedirects(false);
 			StringBuilder sb = thisClient.getHttp().fetchURL(hostUrl + LOGIN_URL,
 					postRequest, headers);
-			loginEnd = System.currentTimeMillis();
-			logger.fine("Time for login1 = "+(loginEnd - loginStart)+" milliseconds.");
-			System.out.println("Time for login1 = "+(loginEnd - loginStart)+" milliseconds.");
-
-			loginStart = System.currentTimeMillis();
-			sb = thisClient.getHttp().fetchURL(thisClient.getHttp().getResponseHeader("Location")[0]);
-			loginEnd = System.currentTimeMillis();
-			logger.fine("Time for login2 = "+(loginEnd - loginStart)+" milliseconds.");
-			System.out.println("Time for login2 = "+(loginEnd - loginStart)+" milliseconds.");
-
-			loginStart = System.currentTimeMillis();
-			sb = thisClient.getHttp().fetchURL(thisClient.getHttp().getResponseHeader("Location")[0]);
-			loginEnd = System.currentTimeMillis();
-			logger.fine("Time for login3 = "+(loginEnd - loginStart)+" milliseconds.");
-			System.out.println("Time for login1 = "+(loginEnd - loginStart)+" milliseconds.");
 			
 			updateElggTokenAndTs(thisClient, sb, true);
-			thisClient.getHttp().setFollowRedirects(true);
 			printErrorMessageIfAny(sb, postRequest);
 			thisClient.setClientState(ClientState.LOGGED_IN);
 			success = true;
@@ -411,7 +443,7 @@ public class Web20Driver {
 		}
 		context.recordTime();
 
-		if (success && context.isTxSteadyState())
+		if (success)
 			elggMetrics.attemptLoginCnt++;
 	}
 
@@ -447,7 +479,7 @@ public class Web20Driver {
 			success = true;
 		}
 		context.recordTime();
-		if (success && context.isTxSteadyState()) {
+		if (success) {
 			elggMetrics.attemptUpdateActivityCnt++;
 		}
 	}
@@ -499,8 +531,7 @@ public class Web20Driver {
 		}
 		context.recordTime();
 
-		if (success && context.isTxSteadyState()) {
-					if (context.isTxSteadyState())
+		if (success) {
 					elggMetrics.attemptAddFriendsCnt++;
 		}/* else {
 			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
@@ -545,7 +576,7 @@ public class Web20Driver {
 		}
 		context.recordTime();
 		
-		if (success && context.isTxSteadyState()) {
+		if (success) {
 				elggMetrics.attemptRecvChatMessageCnt ++;
 		} 
 	}
@@ -598,7 +629,7 @@ public class Web20Driver {
 			success = true;
 		}
 		context.recordTime();
-		if (success && context.isTxSteadyState()) {
+		if (success) {
 				elggMetrics.attemptSendChatMessageCnt ++;
 		} /*else {
 			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
@@ -703,7 +734,7 @@ public class Web20Driver {
 		}
 		context.recordTime();
 
-		if (success && context.isTxSteadyState()) {
+		if (success) {
 			elggMetrics.attemptPostWallCnt++;
 		} /*else {
 			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
@@ -746,13 +777,13 @@ public class Web20Driver {
 			printErrorMessageIfAny(sb, null);
 			//System.out.println(sb);
 			updateElggTokenAndTs(thisClient, sb, false);
-			thisClient.setClientState(ClientState.AT_HOME_PAGE);
+			thisClient.setClientState(ClientState.LOGGED_OUT);
 			success = true;
 
 		}
 		context.recordTime();
 
-		if (success && context.isTxSteadyState()) {
+		if (success) {
 			elggMetrics.attemptLogoutCnt++;
 		} /*else {
 			if (thisClient.getClientState() == ClientState.AT_HOME_PAGE) {
@@ -838,7 +869,7 @@ public class Web20Driver {
 			// System.out.println(sb);
 		}
 		context.recordTime();
-		if (success && context.isTxSteadyState())
+		if (success) 
 			elggMetrics.attemptRegisterCnt++;		
 
 	}
@@ -945,9 +976,15 @@ public class Web20Driver {
 	public static void main(String[] pp) throws Exception {
 		Web20Driver driver = new Web20Driver();
 		System.out.println("Initing ...");
-		driver.accessHomePage();
+
 		driver.doLogin();
+		driver.addFriend();
+		driver.postSelfWall();
+		driver.sendChatMessage();
+		driver.receiveChatMessage();
 		driver.logout();
+		driver.register();
+
 	}
 	
 
