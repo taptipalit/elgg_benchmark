@@ -19,12 +19,15 @@ public class Web20Client {
 	private String email;
 	private String guid;
 
+	private String numActivities;
+	
+	private boolean loggedIn;
+
 	private HttpTransport http;
 	
 	private List<String> chatSessionList; // List of guids of chat sessions of this client. 
 	
 	public enum ClientState {
-		AT_HOME_PAGE,
 		LOGGED_IN,
 		LOGGED_OUT
 	};
@@ -105,5 +108,21 @@ public class Web20Client {
 
 	public void setChatSessionList(List<String> chatSessionList) {
 		this.chatSessionList = chatSessionList;
+	}
+
+	public boolean isLoggedIn() {
+		return loggedIn;
+	}
+
+	public void setLoggedIn(boolean loggedIn) {
+		this.loggedIn = loggedIn;
+	}
+
+	public String getNumActivities() {
+		return numActivities;
+	}
+
+	public void setNumActivities(String numActivities) {
+		this.numActivities = numActivities;
 	}
 }

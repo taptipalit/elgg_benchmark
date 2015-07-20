@@ -27,7 +27,7 @@ public class UserGenerator {
 	private Pair<String, String> tokenTsPair;
 	
 	public UserGenerator(){
-		hostURL = "http://10.22.17.101";
+		hostURL = "http://octeon";
 		tokenTsPair = new Pair<String, String>();
 	}
 	

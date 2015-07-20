@@ -17,14 +17,14 @@
 		</fa:hostConfig>
 		<fa:scale>150</fa:scale>
 		<fa:runControl unit="time">
-			<fa:rampUp>30</fa:rampUp>
+			<fa:rampUp>5</fa:rampUp>
 			<fa:steadyState>300</fa:steadyState>
-			<fa:rampDown>30</fa:rampDown>
+			<fa:rampDown>5</fa:rampDown>
 		</fa:runControl>
 		<outputDir>/home/tpalit/Documents/elgg_output</outputDir>
 		<audit>false</audit>
 		<threadstart>
-			<delay>10000</delay>
+			<delay>5000</delay>
 			<simultaneous>false</simultaneous>
 			<parallel>true</parallel>
 		</threadstart>
