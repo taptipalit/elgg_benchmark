@@ -17,17 +17,31 @@
 		</fa:hostConfig>
 		<fa:scale>150</fa:scale>
 		<fa:runControl unit="time">
-			<fa:rampUp>5</fa:rampUp>
+			<fa:rampUp>30</fa:rampUp>
 			<fa:steadyState>300</fa:steadyState>
-			<fa:rampDown>5</fa:rampDown>
+			<fa:rampDown>30</fa:rampDown>
 		</fa:runControl>
 		<outputDir>/home/tpalit/Documents/elgg_output</outputDir>
 		<audit>false</audit>
-		<threadstart>
-			<delay>5000</delay>
-			<simultaneous>false</simultaneous>
-			<parallel>true</parallel>
-		</threadstart>
+		<threadStart>
+		
+            <!-- The avg time between the start of each thread in
+            an agent -->
+            <delay>2000</delay>
+            <!-- Whether the agents will wait until all threads to
+            be up and then start the load all at once. If
+            set to false, each thread will start executing the
+            operations as soon as it is started. This will
+            gradually load up the server. -->
+            <simultaneous>false</simultaneous>
+            <!-- Whether the agents will start up threads in parallel
+            or not. If set to false, an agent will start all it's
+            threads before the next agent gets to start the
+            threads. The socket connection queue will be less
+            loaded when it is set to false. -->
+            <parallel>false</parallel>
+
+		</threadStart>
 		<stats>
 			<maxruntime>6</maxruntime>
 			<interval>30</interval>

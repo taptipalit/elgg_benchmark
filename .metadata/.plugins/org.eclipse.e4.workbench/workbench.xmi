@@ -11,9 +11,7 @@
     <tags>topLevel</tags>
     <tags>shellMaximized</tags>
     <children xsi:type="basic:PartSashContainer" xmi:id="_cgRa4QP_EeWqNITbxIIhGw" selectedElement="_cgSB8QP_EeWqNITbxIIhGw" horizontal="true">
-      <children xsi:type="advanced:PerspectiveStack" xmi:id="_cgSB8AP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.ide.perspectivestack" visible="false" containerData="7500" selectedElement="_cvcfUAP_EeWqNITbxIIhGw">
-        <tags>Minimized</tags>
-        <tags>MinimizedByZoom</tags>
+      <children xsi:type="advanced:PerspectiveStack" xmi:id="_cgSB8AP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.ide.perspectivestack" containerData="7500" selectedElement="_cvcfUAP_EeWqNITbxIIhGw">
         <children xsi:type="advanced:Perspective" xmi:id="_cvcfUAP_EeWqNITbxIIhGw" elementId="org.eclipse.jdt.ui.JavaPerspective" selectedElement="_cvcfUQP_EeWqNITbxIIhGw" label="Java" iconURI="platform:/plugin/org.eclipse.jdt.ui/icons/full/eview16/jperspective.gif">
           <persistedState key="persp.hiddenItems" value="persp.hideToolbarSC:org.eclipse.debug.ui.commands.RunToLine,persp.hideToolbarSC:org.eclipse.jdt.ui.actions.OpenProjectWizard,persp.hideToolbarSC:org.eclipse.ui.edit.text.toggleShowSelectedElementOnly,"/>
           <tags>persp.actionSet:org.eclipse.mylyn.doc.actionSet</tags>
@@ -125,7 +123,6 @@
       </children>
       <children xsi:type="basic:PartStack" xmi:id="_cgSB8QP_EeWqNITbxIIhGw" elementId="stickyFolderRight" containerData="2500" selectedElement="_cgSB8wP_EeWqNITbxIIhGw">
         <tags>active</tags>
-        <tags>Maximized</tags>
         <children xsi:type="advanced:Placeholder" xmi:id="_cgSB8gP_EeWqNITbxIIhGw" elementId="org.eclipse.help.ui.HelpView" toBeRendered="false" ref="_cgPlsAP_EeWqNITbxIIhGw"/>
         <children xsi:type="advanced:Placeholder" xmi:id="_cgSB8wP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.internal.introview" ref="_cgQz0AP_EeWqNITbxIIhGw"/>
         <children xsi:type="advanced:Placeholder" xmi:id="_cgSB9AP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.cheatsheets.views.CheatSheetView" toBeRendered="false" ref="_cgRa4AP_EeWqNITbxIIhGw"/>
@@ -265,7 +262,7 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_ciu5AAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.workbench.file">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_ci7GQAP_EeWqNITbxIIhGw" elementId="print" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/print_edit.png" tooltip="Print" enabled="false" command="_cCHfVAP_EeWqNITbxIIhGw"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_xuJ3QC_YEeWyZK_XGb_pSw" elementId="print" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/print_edit.png" tooltip="Print" enabled="false" command="_cCHfVAP_EeWqNITbxIIhGw"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_civgEAP_EeWqNITbxIIhGw" elementId="additions" toBeRendered="false">
         <tags>toolbarSeparator</tags>
@@ -286,7 +283,7 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_ciwuMAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.workbench.navigate">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_cjGFYAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.window.pinEditor" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/pin_editor.png" tooltip="Pin Editor" type="Check" command="_cB6D5AP_EeWqNITbxIIhGw"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_xuTBMC_YEeWyZK_XGb_pSw" elementId="org.eclipse.ui.window.pinEditor" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/pin_editor.png" tooltip="Pin Editor" type="Check" command="_cB6D5AP_EeWqNITbxIIhGw"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_cixVQAP_EeWqNITbxIIhGw" elementId="group.editor" toBeRendered="false">
         <tags>toolbarSeparator</tags>
@@ -320,8 +317,8 @@
         <tags>Draggable</tags>
       </children>
     </trimBars>
-    <trimBars xmi:id="_cn2CgAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.trim.vertical1" side="Left">
-      <children xsi:type="menu:ToolControl" xmi:id="_do_WcAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.ide.perspectivestack(minimized)" contributionURI="bundleclass://org.eclipse.e4.ui.workbench.addons.swt/org.eclipse.e4.ui.workbench.addons.minmax.TrimStack">
+    <trimBars xmi:id="_cn2CgAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.trim.vertical1" toBeRendered="false" side="Left">
+      <children xsi:type="menu:ToolControl" xmi:id="_do_WcAP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.ide.perspectivestack(minimized)" toBeRendered="false" contributionURI="bundleclass://org.eclipse.e4.ui.workbench.addons.swt/org.eclipse.e4.ui.workbench.addons.minmax.TrimStack">
         <tags>TrimStack</tags>
       </children>
     </trimBars>
@@ -1959,6 +1956,7 @@
   <commands xmi:id="_cfTKgQP_EeWqNITbxIIhGw" elementId="AUTOGEN:::org.eclipse.mylyn.tasks.ui.actions.view/org.eclipse.mylyn.tasks.ui.open.repositories.view" commandName="Show Task Repositories View" description="Show Task Repositories View" category="_cB2ZhAP_EeWqNITbxIIhGw"/>
   <commands xmi:id="_cfTxkAP_EeWqNITbxIIhGw" elementId="AUTOGEN:::org.eclipse.mylyn.tasks.ui.actions.view/org.eclipse.mylyn.doc.legend.show.action" commandName="Show UI Legend" description="Show Tasks UI Legend" category="_cB2ZhAP_EeWqNITbxIIhGw"/>
   <commands xmi:id="_cfTxkQP_EeWqNITbxIIhGw" elementId="AUTOGEN:::org.eclipse.mylyn.tasks.ui.actions.view/org.eclipse.mylyn.context.ui.actions.tasklist.focus" commandName="Focus on Workweek" description="Focus on Workweek" category="_cB2ZhAP_EeWqNITbxIIhGw"/>
+  <commands xmi:id="_xDPSAC_YEeWyZK_XGb_pSw" elementId="net.sourceforge.vrapper.eclipse.commands.toggle" commandName="Toggle Vrapper" description="Toggles Vrapper" category="_xDOD4S_YEeWyZK_XGb_pSw"/>
   <addons xmi:id="_cBE9dwP_EeWqNITbxIIhGw" elementId="org.eclipse.e4.core.commands.service" contributorURI="platform:/plugin/org.eclipse.platform" contributionURI="bundleclass://org.eclipse.e4.core.commands/org.eclipse.e4.core.commands.CommandServiceAddon"/>
   <addons xmi:id="_cBE9eAP_EeWqNITbxIIhGw" elementId="org.eclipse.e4.ui.contexts.service" contributorURI="platform:/plugin/org.eclipse.platform" contributionURI="bundleclass://org.eclipse.e4.ui.services/org.eclipse.e4.ui.services.ContextServiceAddon"/>
   <addons xmi:id="_cBE9eQP_EeWqNITbxIIhGw" elementId="org.eclipse.e4.ui.bindings.service" contributorURI="platform:/plugin/org.eclipse.platform" contributionURI="bundleclass://org.eclipse.e4.ui.bindings/org.eclipse.e4.ui.bindings.BindingServiceAddon"/>
@@ -2001,4 +1999,5 @@
   <categories xmi:id="_cB2ZiwP_EeWqNITbxIIhGw" elementId="org.eclipse.ui.category.navigate" name="Navigate"/>
   <categories xmi:id="_cB2ZjAP_EeWqNITbxIIhGw" elementId="org.eclipse.jdt.ui.category.source" name="Source" description="Java Source Actions"/>
   <categories xmi:id="_cB2ZjQP_EeWqNITbxIIhGw" elementId="org.eclipse.jdt.ui.category.refactoring" name="Refactor - Java" description="Java Refactoring Actions"/>
+  <categories xmi:id="_xDOD4S_YEeWyZK_XGb_pSw" elementId="net.sourceforge.vrapper.eclipse.commands" name="Vrapper" description="Commands for Vrapper"/>
 </application:Application>

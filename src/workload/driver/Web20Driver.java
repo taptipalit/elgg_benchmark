@@ -59,7 +59,7 @@ import com.sun.faban.driver.Timing;
 		"Register", 
 		"Logout"  },
 		mix = { 
-		@Row ({20, 20,20, 20,  20,  0, 0}),
+		@Row ({0, 100,0, 0,  0,  0, 0}),
 		@Row ({0, 0, 30, 55, 9, 0, 1}),
 		@Row ({0, 0, 30, 55, 9, 0, 1}),
 		@Row ({0, 0, 30, 55, 9, 0, 1}),
@@ -145,6 +145,8 @@ public class Web20Driver {
 
 	
 	private Random random; 
+	
+	private boolean inited;
 	
 	/* Constants : URL */
 	private final String ROOT_URL = "/";
@@ -323,6 +325,9 @@ public class Web20Driver {
 	 */
 	public void browseToElgg() throws Exception {
 		boolean success = false;
+		if (!inited) 
+			logger.info("Inited thread" + context.getThreadId());
+		inited = true;
 		logger.fine(context.getThreadId() +" : Doing operation: browsetoelgg");
 		context.recordTime();
 
