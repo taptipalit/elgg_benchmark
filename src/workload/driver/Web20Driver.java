@@ -197,7 +197,7 @@ public class Web20Driver {
 		userPasswordList = new ArrayList<UserPasswordPair>();
 
 		logger = context.getLogger();
-		logger.setLevel(Level.FINE);
+		logger.setLevel(Level.INFO);
 
 		//fileTxt = new FileHandler("Faban_3log%u.%g.txt", 0, 500);
 		//formatterTxt = new SimpleFormatter();
