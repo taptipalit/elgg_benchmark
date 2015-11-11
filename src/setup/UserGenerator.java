@@ -1,5 +1,6 @@
 package setup;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,8 +27,8 @@ public class UserGenerator {
 	private List<UserEntity> userList;
 	private Pair<String, String> tokenTsPair;
 	
-	public UserGenerator(){
-		hostURL = "http://octeon";
+	public UserGenerator(String host){
+		hostURL = host;
 		tokenTsPair = new Pair<String, String>();
 	}
 	
@@ -52,7 +53,7 @@ public class UserGenerator {
 		properties = new Properties();
 		String propFileName = "usersetup.properties";
 		
-		InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(propFileName);
+		InputStream inputStream = new FileInputStream("/faban/"+propFileName);
 		
 		if (null != inputStream) {
 			properties.load(inputStream);
@@ -140,7 +141,7 @@ public class UserGenerator {
 	}
 	
 	public static void main(String[] args) throws Exception {
-		UserGenerator gen = new UserGenerator();
+		UserGenerator gen = new UserGenerator(args[0]);
 		gen.loadProperties();
 		gen.generateUsers();
 		gen.createUsers();
@@ -148,7 +149,7 @@ public class UserGenerator {
 	}
 
 	private void writeUserFile() throws FileNotFoundException {
-		String outputFile = properties.getProperty("output_file").trim();
+		String outputFile = "/faban/"+properties.getProperty("output_file").trim();
 		
 		
 		PrintWriter pw = new PrintWriter(outputFile);

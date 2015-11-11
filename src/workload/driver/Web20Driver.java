@@ -1,6 +1,9 @@
 package workload.driver;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
@@ -21,9 +24,6 @@ import javax.xml.xpath.XPathExpressionException;
 
 import org.json.JSONObject;
 
-import workload.driver.RandomStringGenerator.Mode;
-import workload.driver.Web20Client.ClientState;
-
 import com.sun.faban.driver.Background;
 import com.sun.faban.driver.BenchmarkDefinition;
 import com.sun.faban.driver.BenchmarkDriver;
@@ -38,13 +38,17 @@ import com.sun.faban.driver.OnceAfter;
 import com.sun.faban.driver.Row;
 import com.sun.faban.driver.Timing;
 
+import workload.driver.RandomStringGenerator.Mode;
+import workload.driver.Web20Client.ClientState;
+
 @BenchmarkDefinition(name = "Elgg benchmark", version = "1.0")
 @BenchmarkDriver(name = "ElggDriver", 
 									/*
 									 * Should be the same as the name attribute
 									 * of driverConfig in run.xml
 									 */
-				 threadPerScale = 1)
+				 threadPerScale = 1,
+				 percentiles = {  "95"})
 
 /**
  * The mix of operations and their proabilities.
@@ -82,8 +86,8 @@ import com.sun.faban.driver.Timing;
 @Background(operations = 
 	{ "UpdateActivity", "ReceiveChatMessage"}, 
 	timings = { 
-		@FixedTime(cycleTime = 15000, cycleDeviation = 2),
-		@FixedTime(cycleTime = 20000, cycleDeviation = 2) }
+		@FixedTime(cycleTime = 3000, cycleDeviation = 2),
+		@FixedTime(cycleTime = 3000, cycleDeviation = 2) }
 		
 )
 
@@ -101,7 +105,7 @@ import com.sun.faban.driver.Timing;
 		 cycleType = CycleType.THINKTIME)
 
 */
-@FixedTime(cycleTime = 20000,
+@FixedTime(cycleTime = 3000,
 	cycleType = CycleType.THINKTIME, cycleDeviation = 1000)
 // cycle time or think time - count from the start of prev operation or end
 
@@ -220,9 +224,9 @@ public class Web20Driver {
 			System.out.println(handler);
 		}
 		*/
-		
-		BufferedReader bw = new BufferedReader(new InputStreamReader(this
-				.getClass().getClassLoader().getResourceAsStream("users.xml")));
+	
+		File usersFile = new File("/faban/users.list");
+		BufferedReader bw = new BufferedReader(new FileReader(usersFile));
 		String line;
 		while ((line = bw.readLine()) != null) {
 			String tokens[] = line.split(" ");
@@ -238,7 +242,7 @@ public class Web20Driver {
 		context.attachMetrics(elggMetrics);
 		
 		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
-		hostUrl = "http://octeon";
+		//hostUrl = "http://spaten";
 		random = new Random();
 	}
 
@@ -316,7 +320,8 @@ public class Web20Driver {
 	}
 	
 	@BenchmarkOperation(name = "BrowsetoElgg", 
-						max90th = 4.0, 
+						max90th = 3.0,
+						percentileLimits= {3.0},
 						timing = Timing.MANUAL)
 	/**
 	 * A new client accesses the home page. The "new client" is selected from a list maintained of possible users and their passwords.
@@ -368,7 +373,7 @@ public class Web20Driver {
 	}
 
 @BenchmarkOperation(name = "AccessHomepage", 
-						max90th = 4.0, 
+						max90th = 3.0, percentileLimits= {3.0},
 						timing = Timing.MANUAL)
 	/**
 	 * A logged in client accesses the home page
@@ -403,7 +408,7 @@ public class Web20Driver {
 	}
 
 	@BenchmarkOperation(name = "DoLogin", 
-						max90th = 5.0,
+						max90th = 3.0, percentileLimits= {3.0}, 
 						timing = Timing.MANUAL)
 	public void doLogin() throws Exception {
 		boolean success = false;
@@ -456,7 +461,7 @@ public class Web20Driver {
 			elggMetrics.attemptLoginCnt++;
 	}
 
-	@BenchmarkOperation(name = "UpdateActivity", max90th = 2.0, timing = Timing.MANUAL)
+	@BenchmarkOperation(name = "UpdateActivity", max90th = 1.0, percentileLimits= {1.0}, timing = Timing.MANUAL)
 	public void updateActivity() throws Exception {
 		boolean success = false;
 
@@ -499,7 +504,7 @@ public class Web20Driver {
 	 * @throws Exception
 	 */
 	@BenchmarkOperation(name = "AddFriend", 
-						max90th = 2.0,
+						max90th = 3.0, percentileLimits= {3.0},
 						timing = Timing.MANUAL)
 	public void addFriend() throws Exception {
 		boolean success = false;
@@ -557,7 +562,7 @@ public class Web20Driver {
 	 * Receive a chat message.
 	 */
 	@BenchmarkOperation(name = "ReceiveChatMessage", 
-			max90th = 2.0,
+			max90th = 1.0, percentileLimits= {1.0},
 			timing = Timing.MANUAL)
 	public void receiveChatMessage() throws Exception {
 		boolean success = false;
@@ -596,7 +601,7 @@ public class Web20Driver {
 	 * @throws Exception
 	 */
 	@BenchmarkOperation(name = "SendChatMessage", 
-						max90th = 2.0,
+						max90th = 1.0, percentileLimits= {1.0},
 						timing = Timing.MANUAL)
 	public void sendChatMessage() throws Exception {
 		boolean success = false;
@@ -709,7 +714,7 @@ public class Web20Driver {
 	 * @throws Exception
 	 */
 	@BenchmarkOperation(name = "PostSelfWall", 
-						max90th = 2.0,
+						max90th = 1.0, percentileLimits= {1.0},
 						timing = Timing.MANUAL)
 	public void postSelfWall() throws Exception {
 		boolean success = false;
@@ -764,7 +769,7 @@ public class Web20Driver {
 	 * @throws Exception
 	 */
 	@BenchmarkOperation(name = "Logout", 
-						max90th = 4.0,
+						max90th = 3.0, percentileLimits= {3.0},
 						timing = Timing.MANUAL)
 	public void logout() throws Exception {
 		boolean success = false;
@@ -814,7 +819,7 @@ public class Web20Driver {
 	 * 
 	 */
 	@BenchmarkOperation(name = "Register", 
-						max90th = 5.0,
+						max90th = 3.0, percentileLimits= {3.0},
 						timing = Timing.MANUAL)
 	public void register() throws Exception {
 		boolean success = false;
@@ -1018,11 +1023,11 @@ public class Web20Driver {
 			driver.doLogin();
 			long end = System.currentTimeMillis();
 			System.out.println("RUN\t"+i+"\t"+(end-start));
-			//System.out.println("Doing add friend ....................................");
-			//driver.addFriend();
-			//System.out.println("Doing post wall ............................");
-			//driver.postSelfWall();
-			/*
+			System.out.println("Doing add friend ....................................");
+			driver.addFriend();
+			System.out.println("Doing post wall ............................");
+			driver.postSelfWall();
+			
 			System.out.println("Doing send chat .................................");
 			driver.sendChatMessage();
 			System.out.println("Doing recv chat ......................................");
@@ -1033,7 +1038,7 @@ public class Web20Driver {
 			driver.logout();
 			System.out.println("Doing register ...........................");
 			driver.register();
-			*/
+			
 		}
 	}
 	

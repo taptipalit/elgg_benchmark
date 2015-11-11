@@ -15,10 +15,10 @@
 			<fh:tools>NONE</fh:tools>
 			<fh:userCommands />
 		</fa:hostConfig>
-		<fa:scale>150</fa:scale>
+		<fa:scale>190</fa:scale>
 		<fa:runControl unit="time">
 			<fa:rampUp>30</fa:rampUp>
-			<fa:steadyState>300</fa:steadyState>
+			<fa:steadyState>50</fa:steadyState>
 			<fa:rampDown>30</fa:rampDown>
 		</fa:runControl>
 		<outputDir>/home/tpalit/Documents/elgg_output</outputDir>
@@ -27,7 +27,7 @@
 		
             <!-- The avg time between the start of each thread in
             an agent -->
-            <delay>2000</delay>
+            <delay>1000</delay>
             <!-- Whether the agents will wait until all threads to
             be up and then start the load all at once. If
             set to false, each thread will start executing the
@@ -59,7 +59,7 @@
 		</driverConfig>
 	</fa:runConfig>
 	<serverConfig>
-			<host>octeon</host>
+			<host>whitbread</host>
 			<port>80</port>
 	</serverConfig>
 	

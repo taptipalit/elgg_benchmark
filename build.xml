@@ -151,4 +151,32 @@
             </sequential>
         </parallel>
     </target>
+	
+    <target name="usergen-jar" depends="compile">
+        <mkdir dir="build/jar"/>
+        <jar destfile="build/Usergen.jar" basedir="build/classes">
+            <manifest>
+                <attribute name="Main-Class" value="setup.UserGenerator"/>
+            	<attribute name="Class-Path" value="commons-codec-1.2.jar commons-httpclient-3.1.jar commons-logging.jar fabanagents.jar fabancommon.jar fabandriver.jar" />
+            </manifest>
+        	<fileset dir="src" includes="**/*.java"/>
+            <fileset dir="." includes="bin/**/*, lib/**/*, resources/**/*, public_html/**/*"/>
+            <fileset dir="${build.dir}" includes="lib/**/*"/>
+        	<fileset dir="${classes.dir}" includes="**/*.class **/*.txt **/*.xml"/>
+        </jar>
+        	<copy file="${lib.dir}/commons-codec-1.2.jar" todir="${build.dir}" />
+        	<copy file="${lib.dir}/commons-httpclient-3.1.jar" todir="${build.dir}" />
+        	<copy file="${lib.dir}/commons-logging.jar" todir="${build.dir}" />
+        	<copy file="${lib.dir}/fabanagents.jar" todir="${build.dir}" />
+        	<copy file="${lib.dir}/fabancommon.jar" todir="${build.dir}" />
+        	<copy file="${lib.dir}/fabandriver.jar" todir="${build.dir}" />
+
+    </target>
+
+    <target name="usergen-run" depends="usergen-jar">
+        <java jar="build/Usergen.jar" fork="true">
+          	<arg value="${arg0}"/>
+    	</java>
+    </target>
+
 </project>
