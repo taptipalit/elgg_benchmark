@@ -86,8 +86,8 @@ import workload.driver.Web20Client.ClientState;
 @Background(operations = 
 	{ "UpdateActivity", "ReceiveChatMessage"}, 
 	timings = { 
-		@FixedTime(cycleTime = 3000, cycleDeviation = 2),
-		@FixedTime(cycleTime = 3000, cycleDeviation = 2) }
+		@FixedTime(cycleTime = 10000, cycleDeviation = 2),
+		@FixedTime(cycleTime = 10000, cycleDeviation = 2) }
 		
 )
 
@@ -105,7 +105,7 @@ import workload.driver.Web20Client.ClientState;
 		 cycleType = CycleType.THINKTIME)
 
 */
-@FixedTime(cycleTime = 3000,
+@FixedTime(cycleTime = 10000,
 	cycleType = CycleType.THINKTIME, cycleDeviation = 1000)
 // cycle time or think time - count from the start of prev operation or end
 
