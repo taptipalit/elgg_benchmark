@@ -266,11 +266,6 @@ public class Web20Driver {
 	
 	private void updateElggTokenAndTs(Web20Client client, StringBuilder sb, boolean updateGUID) {
 
-		/* In the page, there is - 
-		
-		<input type="hidden" name="__elgg_token" value="cbeca8b16cdc8e7babb4fb0da5dfd42b" />
-		<input type="hidden" name="__elgg_ts" value="1435455938" />
-		*/
 		String elggToken = null;
 		String elggTs = null;
 		
