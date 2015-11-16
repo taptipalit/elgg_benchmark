@@ -241,7 +241,7 @@ public class Web20Driver {
 		elggMetrics = new ElggDriverMetrics();
 		context.attachMetrics(elggMetrics);
 		
-		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host");
+		hostUrl = "http://"+context.getXPathValue("/webbenchmark/serverConfig/host")+":"+context.getXPathValue("/webbenchmark/serverConfig/port");
 		//hostUrl = "http://spaten";
 		random = new Random();
 	}
